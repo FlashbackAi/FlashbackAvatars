@@ -16,238 +16,99 @@ from src.pipeline_wan_fun_inpaint_audio import WanFunInpaintAudioPipeline
 from src.utils import filter_kwargs
 
 class EchoMimicEngine:
-    def __init__(self, model_dir, wav2vec_dir, device="auto", low_mem_mode=True):
+    def __init__(self, model_dir, wav2vec_dir, device="auto"):
         # Auto-detect device
         if device == "auto":
             if torch.cuda.is_available():
-                # Check available GPU memory
+                self.device = "cuda"
                 gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3  # GB
                 print(f"🚀 Using GPU: {torch.cuda.get_device_name()} ({gpu_memory:.1f}GB)")
-                
-                # Use the provided low_mem_mode setting
-                self.low_mem_mode = low_mem_mode
-                if self.low_mem_mode:
-                    print("⚡ Low memory optimizations enabled")
-                else:
-                    print("🚀 Full memory mode enabled")
-                    
-                self.device = "cuda"
             else:
                 self.device = "cpu"
-                self.low_mem_mode = False
                 print("⚠️  CUDA not available, using CPU")
         else:
             self.device = device
-            self.low_mem_mode = low_mem_mode
-            
+
         self.weight_dtype = torch.float16 if self.device == "cuda" else torch.float32
-        print(f"📱 Device: {self.device}, Data type: {self.weight_dtype}, Low mem: {self.low_mem_mode}")
-        
-        # Set memory optimization environment variables
-        if self.low_mem_mode and self.device == "cuda":
-            os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-            torch.cuda.empty_cache()  # Clear any existing cache
-        
-        # Store paths and configs for lazy loading
-        self.model_dir = model_dir
-        self.wav2vec_dir = wav2vec_dir
-        
+        print(f"📱 Device: {self.device}, Data type: {self.weight_dtype}")
+
         # Load configuration
         config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'third_party', 'echomimic_v3', 'config', 'config.yaml')
         try:
-            self.cfg = OmegaConf.load(config_path)
+            cfg = OmegaConf.load(config_path)
             print(f"✅ Config loaded from: {config_path}")
         except Exception as e:
             print(f"❌ Failed to load config: {e}")
             # Fallback to minimal config
-            self.cfg = OmegaConf.create({
+            cfg = OmegaConf.create({
                 'transformer_additional_kwargs': {},
-                'vae_additional_kwargs': {},
-                'text_encoder_additional_kwargs': {}
+                'vae_kwargs': {'vae_subpath': 'Wan2.1_VAE.pth'},
+                'text_encoder_kwargs': {'tokenizer_subpath': 'google/umt5-xxl', 'text_encoder_subpath': 'models_t5_umt5-xxl-enc-bf16.pth'},
+                'image_encoder_kwargs': {'image_encoder_subpath': 'models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth'},
+                'scheduler_kwargs': {}
             })
-        
-        # Initialize model containers (will be loaded on demand)
-        self.transformer = None
-        self.vae = None
-        self.text_encoder = None
-        self.tokenizer = None
-        self.clip_image_encoder = None
-        self.wav2vec_model = None
-        self.audio_proc = None
-        self.scheduler = None
-        self.pipe = None
-        
-        print("✅ EchoMimic engine initialized with lazy loading!")
-        print("🔄 Models will be loaded on-demand during inference")
-    
-    def load_transformer(self):
-        """Load transformer model on demand"""
-        if self.transformer is None:
-            print("🔄 Loading transformer...")
-            if self.low_mem_mode and self.device == "cuda":
-                torch.cuda.empty_cache()
 
-            # Monitor memory usage
-            if torch.cuda.is_available():
-                mem_before = torch.cuda.memory_allocated() / 1024**3
-                print(f"📊 GPU memory before transformer: {mem_before:.1f}GB")
+        # Load transformer
+        print("🔄 Loading transformer...")
+        self.transformer = WanTransformerAudioMask3DModel.from_pretrained(
+            model_dir,
+            transformer_additional_kwargs=OmegaConf.to_container(cfg['transformer_additional_kwargs']),
+            torch_dtype=self.weight_dtype,
+        ).eval().to(self.device)
 
-            self.transformer = WanTransformerAudioMask3DModel.from_pretrained(
-                self.model_dir,
-                transformer_additional_kwargs=OmegaConf.to_container(self.cfg.get('transformer_additional_kwargs', {})),
-                torch_dtype=self.weight_dtype,
-            ).eval()
+        # Load VAE - the path points directly to the .pth file
+        print("🔄 Loading VAE...")
+        vae_path = os.path.join(model_dir, cfg['vae_kwargs'].get('vae_subpath', 'Wan2.1_VAE.pth'))
+        self.vae = AutoencoderKLWan.from_pretrained(
+            vae_path,
+            additional_kwargs=OmegaConf.to_container(cfg['vae_kwargs']),
+        ).to(self.weight_dtype).to(self.device).eval()
 
-            if self.device == "cuda":
-                self.transformer = self.transformer.to(self.device)
-                if self.low_mem_mode:
-                    torch.cuda.empty_cache()
+        # Load tokenizer and text encoder
+        print("🔄 Loading text encoder...")
+        tokenizer_path = cfg['text_encoder_kwargs'].get('tokenizer_subpath', 'google/umt5-xxl')
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
 
-                mem_after = torch.cuda.memory_allocated() / 1024**3
-                print(f"📊 GPU memory after transformer: {mem_after:.1f}GB (+{mem_after-mem_before:.1f}GB)")
-    
-    def load_vae(self):
-        """Load VAE model on demand"""
-        if self.vae is None:
-            print("🔄 Loading VAE...")
-            vae_path = os.path.join(self.model_dir, self.cfg['vae_kwargs'].get('vae_subpath', 'Wan2.1_VAE.pth'))
-            self.vae = AutoencoderKLWan.from_pretrained(
-                vae_path,
-                additional_kwargs=OmegaConf.to_container(self.cfg['vae_kwargs']),
-            ).to(self.weight_dtype).eval()
-            
-            if self.device == "cuda":
-                self.vae = self.vae.to(self.device)
-                if self.low_mem_mode:
-                    torch.cuda.empty_cache()
-                    print(f"   GPU memory after VAE: {torch.cuda.memory_allocated()/1024**3:.2f}GB")
-    
-    def load_text_encoder(self):
-        """Load text encoder on demand"""
-        if self.text_encoder is None or self.tokenizer is None:
-            print("🔄 Loading text encoder...")
-            tokenizer_path = self.cfg['text_encoder_kwargs'].get('tokenizer_subpath', 'google/umt5-xxl')
-            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
-            
-            text_encoder_path = os.path.join(self.model_dir, self.cfg['text_encoder_kwargs'].get('text_encoder_subpath', 'models_t5_umt5-xxl-enc-bf16.pth'))
-            self.text_encoder = WanT5EncoderModel.from_pretrained(
-                text_encoder_path,
-                additional_kwargs=OmegaConf.to_container(self.cfg['text_encoder_kwargs']),
-                torch_dtype=self.weight_dtype,
-            ).eval()
-            
-            if self.device == "cuda":
-                self.text_encoder = self.text_encoder.to(self.device)
-                if self.low_mem_mode:
-                    torch.cuda.empty_cache()
-                    print(f"   GPU memory after text encoder: {torch.cuda.memory_allocated()/1024**3:.2f}GB")
-    
-    def load_clip_encoder(self):
-        """Load CLIP image encoder on demand"""
-        if self.clip_image_encoder is None:
-            print("🔄 Loading CLIP image encoder...")
-            image_encoder_path = os.path.join(self.model_dir, self.cfg['image_encoder_kwargs'].get('image_encoder_subpath', 'models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth'))
-            self.clip_image_encoder = CLIPModel.from_pretrained(
-                image_encoder_path,
-            ).to(self.weight_dtype).eval()
-            
-            if self.device == "cuda":
-                self.clip_image_encoder = self.clip_image_encoder.to(self.device)
-                if self.low_mem_mode:
-                    torch.cuda.empty_cache()
-                    print(f"   GPU memory after CLIP: {torch.cuda.memory_allocated()/1024**3:.2f}GB")
-    
-    def load_wav2vec(self):
-        """Load Wav2Vec model on demand"""
-        if self.wav2vec_model is None or self.audio_proc is None:
-            print("🔄 Loading Wav2Vec models...")
-            self.audio_proc = Wav2Vec2Processor.from_pretrained(self.wav2vec_dir)
-            self.wav2vec_model = Wav2Vec2Model.from_pretrained(self.wav2vec_dir).eval()
-            
-            if self.device == "cuda":
-                self.wav2vec_model = self.wav2vec_model.to(self.device)
-                self.wav2vec_model.requires_grad_(False)
-    
-    def unload_model(self, model_name):
-        """Unload a specific model to free VRAM"""
-        if model_name == "text_encoder" and self.text_encoder is not None:
-            del self.text_encoder
-            del self.tokenizer
-            self.text_encoder = None
-            self.tokenizer = None
-            print(f"🗑️  Unloaded text encoder")
-        elif model_name == "clip" and self.clip_image_encoder is not None:
-            del self.clip_image_encoder
-            self.clip_image_encoder = None
-            print(f"🗑️  Unloaded CLIP encoder")
-        elif model_name == "wav2vec" and self.wav2vec_model is not None:
-            del self.wav2vec_model
-            del self.audio_proc
-            self.wav2vec_model = None
-            self.audio_proc = None
-            print(f"🗑️  Unloaded Wav2Vec model")
-        
-        if self.device == "cuda":
-            torch.cuda.empty_cache()
-            print(f"   GPU memory after unload: {torch.cuda.memory_allocated()/1024**3:.2f}GB")
-    
-    def create_pipeline(self):
-        """Create pipeline with loaded models"""
-        if self.scheduler is None:
-            self.scheduler = FlowMatchEulerDiscreteScheduler(**filter_kwargs(FlowMatchEulerDiscreteScheduler, OmegaConf.to_container(self.cfg['scheduler_kwargs'])))
-        
-        if self.pipe is None:
-            print("🔄 Creating pipeline...")
-            self.pipe = WanFunInpaintAudioPipeline(
-                transformer=self.transformer,
-                vae=self.vae,
-                tokenizer=self.tokenizer,
-                text_encoder=self.text_encoder,
-                scheduler=self.scheduler,
-                clip_image_encoder=self.clip_image_encoder,
-            )
-            if self.device == "cuda":
-                self.pipe.to(device=self.device)
+        text_encoder_path = os.path.join(model_dir, cfg['text_encoder_kwargs'].get('text_encoder_subpath', 'models_t5_umt5-xxl-enc-bf16.pth'))
+        self.text_encoder = WanT5EncoderModel.from_pretrained(
+            text_encoder_path,
+            additional_kwargs=OmegaConf.to_container(cfg['text_encoder_kwargs']),
+            torch_dtype=self.weight_dtype,
+        ).eval().to(self.device)
+
+        # Load CLIP image encoder - the path points directly to the .pth file
+        print("🔄 Loading CLIP image encoder...")
+        image_encoder_path = os.path.join(model_dir, cfg['image_encoder_kwargs'].get('image_encoder_subpath', 'models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth'))
+        self.clip_image_encoder = CLIPModel.from_pretrained(
+            image_encoder_path,
+        ).to(self.weight_dtype).to(self.device).eval()
+
+        # Load scheduler
+        self.scheduler = FlowMatchEulerDiscreteScheduler(**filter_kwargs(FlowMatchEulerDiscreteScheduler, OmegaConf.to_container(cfg['scheduler_kwargs'])))
+
+        # Create pipeline
+        self.pipe = WanFunInpaintAudioPipeline(
+            transformer=self.transformer,
+            vae=self.vae,
+            tokenizer=self.tokenizer,
+            text_encoder=self.text_encoder,
+            scheduler=self.scheduler,
+            clip_image_encoder=self.clip_image_encoder,
+        )
+        self.pipe.to(device=self.device)
+
+        # Load Wav2Vec models
+        print("🔄 Loading Wav2Vec...")
+        self.audio_proc = Wav2Vec2Processor.from_pretrained(wav2vec_dir)
+        self.wav2vec_model = Wav2Vec2Model.from_pretrained(wav2vec_dir).eval()
+        self.wav2vec_model.requires_grad_(False)
+
+        print("✅ EchoMimic engine initialized successfully!")
 
     def generate_frame(self, image, audio_array, steps=8, cfg=2.5):
-        """Generate frame with lazy loading and memory management"""
-        print("🚀 Starting inference with lazy loading...")
-
-        # Aggressive memory cleanup before starting
-        if self.device == "cuda":
-            torch.cuda.empty_cache()
-            initial_mem = torch.cuda.memory_allocated() / 1024**3
-            print(f"📊 Initial GPU memory: {initial_mem:.1f}GB")
-
-        # Step 1: Load and process audio
-        print("📊 Step 1: Loading wav2vec...")
-        self.load_wav2vec()
+        # preprocess audio
         audio_feats = self.audio_proc(audio_array, sampling_rate=16000,
                                       return_tensors="pt").input_values.to(self.device)
-        # Unload wav2vec immediately after processing
-        self.unload_model("wav2vec")
-
-        # Step 2: Load text encoder (if needed for conditioning)
-        print("📊 Step 2: Loading text encoder...")
-        self.load_text_encoder()
-
-        # Step 3: Load CLIP encoder for image processing
-        print("📊 Step 3: Loading CLIP encoder...")
-        self.load_clip_encoder()
-
-        # Step 4: Load core models for generation
-        print("📊 Step 4: Loading transformer...")
-        self.load_transformer()
-
-        print("📊 Step 5: Loading VAE...")
-        self.load_vae()
-
-        # Step 6: Create pipeline with all loaded models
-        print("📊 Step 6: Creating pipeline...")
-        self.create_pipeline()
-        
-        # Step 6: Run inference
-        print("🎬 Running inference...")
         with torch.no_grad():
             out = self.pipe(
                 image=image,
@@ -255,72 +116,36 @@ class EchoMimicEngine:
                 num_inference_steps=steps,
                 guidance_scale=cfg
             )
-        
-        # Step 7: Clean up non-essential models after inference
-        self.unload_model("text_encoder")
-        self.unload_model("clip")
-        
-        print("✅ Inference complete!")
-        if self.device == "cuda":
-            memory_allocated = torch.cuda.memory_allocated() / 1024**3
-            print(f"🔥 Final GPU Memory: {memory_allocated:.2f}GB")
-        
-        return out.videos[0]
+        return out.images[0]
 
-    def generate_video(self, video_array, clip_image, audio_array, steps=8, cfg=2.5):
-        """Generate video with lazy loading and memory management"""
-        print("🚀 Starting video inference with lazy loading...")
+    def generate_video(self, video_frames, reference_image, audio_array, steps=8, cfg=2.5):
+        """Generate video with audio-driven animation using EchoMimic v3"""
+        print(f"🎬 Generating video from reference image with audio")
 
-        # Step 1: Load and process audio
-        self.load_wav2vec()
-        audio_embeds = self.audio_proc(audio_array, sampling_rate=16000,
-                                       return_tensors="pt").input_values.to(self.device)
-        with torch.no_grad():
-            audio_embeds = self.wav2vec_model(audio_embeds).last_hidden_state
-        # Unload wav2vec after processing
-        self.unload_model("wav2vec")
+        # preprocess audio
+        audio_feats = self.audio_proc(audio_array, sampling_rate=16000,
+                                      return_tensors="pt").input_values.to(self.device)
 
-        # Step 2: Load text encoder (if needed for conditioning)
-        self.load_text_encoder()
-
-        # Step 3: Load CLIP encoder for image processing
-        self.load_clip_encoder()
-
-        # Step 4: Load core models for generation
-        self.load_transformer()
-        self.load_vae()
-
-        # Step 5: Create pipeline with all loaded models
-        self.create_pipeline()
-
-        # Step 6: Convert video array to tensor format
-        import torch
-        import torchvision.transforms.functional as TF
-
-        # Convert video array (frames, H, W, C) to tensor (1, C, frames, H, W)
-        video_tensor = torch.from_numpy(video_array).float() / 255.0  # normalize to [0,1]
-        video_tensor = video_tensor.permute(3, 0, 1, 2)  # (C, frames, H, W)
-        video_tensor = video_tensor.unsqueeze(0)  # (1, C, frames, H, W)
-
-        # Step 7: Run inference
-        print("🎬 Running video inference...")
+        # EchoMimic v3 generates video from single reference image + audio
         with torch.no_grad():
             out = self.pipe(
-                video=video_tensor,
-                clip_image=clip_image,
-                audio_embeds=audio_embeds,
+                image=reference_image,  # Reference image for identity/appearance
+                audio_features=audio_feats,  # Audio for lip-sync and expression
                 num_inference_steps=steps,
                 guidance_scale=cfg,
-                num_frames=video_array.shape[0]  # use actual number of frames
+                # Additional parameters for video generation
+                height=reference_image.height if hasattr(reference_image, 'height') else 512,
+                width=reference_image.width if hasattr(reference_image, 'width') else 512,
             )
 
-        # Step 8: Clean up non-essential models after inference
-        self.unload_model("text_encoder")
-        self.unload_model("clip")
-
-        print("✅ Video inference complete!")
-        if self.device == "cuda":
-            memory_allocated = torch.cuda.memory_allocated() / 1024**3
-            print(f"🔥 Final GPU Memory: {memory_allocated:.2f}GB")
-
-        return out.videos[0]
+        # Return the generated video frames
+        if hasattr(out, 'frames') and out.frames is not None:
+            print(f"✅ Generated {len(out.frames)} video frames")
+            return out.frames
+        elif hasattr(out, 'images') and out.images is not None:
+            print(f"✅ Generated {len(out.images)} images")
+            return out.images
+        else:
+            # Fallback: generate single frame
+            print("⚠️ Falling back to single frame generation")
+            return [self.generate_frame(reference_image, audio_array, steps, cfg)]
