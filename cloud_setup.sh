@@ -18,17 +18,9 @@ apt-get install -y git wget curl unzip
 echo "🐍 Installing Python dependencies..."
 pip install --upgrade pip
 
-# Install PyTorch with CUDA
-echo "🔥 Installing PyTorch with CUDA..."
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-
-# Install EchoMimic v3 dependencies
-echo "🎭 Installing EchoMimic v3 dependencies..."
-pip install omegaconf einops safetensors timm tomesd torchdiffeq torchsde decord scikit-image opencv-python SentencePiece albumentations imageio[ffmpeg] tensorboard beautifulsoup4 ftfy func_timeout onnxruntime moviepy==2.2.1 retina-face==0.0.17 librosa
-
-# Install web server dependencies
-echo "🌐 Installing web server dependencies..."
-pip install fastapi uvicorn
+# Install all dependencies from requirements.txt
+echo "📦 Installing all dependencies from requirements.txt..."
+pip install -r requirements.txt
 
 # Download models
 echo "🎭 Downloading EchoMimic v3 models..."

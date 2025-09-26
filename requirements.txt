@@ -1,0 +1,54 @@
+# PyTorch with CUDA support (install first)
+torch
+torchvision
+torchaudio
+--index-url https://download.pytorch.org/whl/cu121
+
+# Core ML/AI dependencies
+transformers
+diffusers
+omegaconf
+einops
+safetensors
+timm
+tomesd
+torchdiffeq
+torchsde
+
+# Image/Video processing
+decord
+scikit-image
+opencv-python
+albumentations
+imageio[ffmpeg]
+pillow
+moviepy==2.2.1
+
+# Audio processing
+librosa
+SentencePiece
+
+# Utilities and other dependencies
+tensorboard
+beautifulsoup4
+ftfy
+func_timeout
+onnxruntime
+retina-face==0.0.17
+
+# Web server and API
+fastapi
+uvicorn
+pydantic
+
+# Basic Python dependencies
+numpy
+requests
+tqdm
+pathlib
+
+# Hugging Face Hub (for model uploads)
+huggingface_hub
+
+# Development and testing
+pytest
