@@ -34,9 +34,3 @@ git submodule init
 git submodule update
 
 echo "✅ Submodules setup complete!"
-echo ""
-echo "📋 To clone this repo with submodules in the future:"
-echo "git clone --recursive https://github.com/FlashbackAi/FlashbackAvatars.git"
-echo ""
-echo "📋 To update submodules:"
-echo "git submodule update --remote"
