@@ -18,8 +18,12 @@ apt-get install -y git wget curl unzip
 echo "🐍 Installing Python dependencies..."
 pip install --upgrade pip
 
-# Install all dependencies from requirements.txt
-echo "📦 Installing all dependencies from requirements.txt..."
+# Install PyTorch with CUDA first
+echo "🔥 Installing PyTorch with CUDA..."
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Install remaining dependencies from requirements.txt
+echo "📦 Installing remaining dependencies from requirements.txt..."
 pip install -r requirements.txt
 
 # Download models

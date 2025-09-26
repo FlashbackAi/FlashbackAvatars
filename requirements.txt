@@ -1,8 +1,8 @@
-# PyTorch with CUDA support (install first)
+# PyTorch with CUDA support
+# Note: Install with: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 torch
 torchvision
 torchaudio
---index-url https://download.pytorch.org/whl/cu121
 
 # Core ML/AI dependencies
 transformers
@@ -49,5 +49,3 @@ tqdm
 # Hugging Face Hub (for model uploads)
 huggingface_hub
 
-# Development and testing
-pytest
