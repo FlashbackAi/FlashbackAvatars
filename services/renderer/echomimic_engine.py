@@ -54,7 +54,17 @@ class EchoMimicEngine:
         
         # Load configuration
         config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'third_party', 'echomimic_v3', 'config', 'config.yaml')
-        self.cfg = OmegaConf.load(config_path)
+        try:
+            self.cfg = OmegaConf.load(config_path)
+            print(f"✅ Config loaded from: {config_path}")
+        except Exception as e:
+            print(f"❌ Failed to load config: {e}")
+            # Fallback to minimal config
+            self.cfg = OmegaConf.create({
+                'transformer_additional_kwargs': {},
+                'vae_additional_kwargs': {},
+                'text_encoder_additional_kwargs': {}
+            })
         
         # Initialize model containers (will be loaded on demand)
         self.transformer = None
