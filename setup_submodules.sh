@@ -5,28 +5,36 @@
 echo "🔗 Setting up Git Submodules for Third-Party Dependencies"
 echo "========================================================="
 
-# Remove existing third_party directory if it exists
-if [ -d "third_party" ]; then
-    echo "🗑️  Removing existing third_party directory..."
-    rm -rf third_party
-fi
-
 # Create third_party directory
 mkdir -p third_party
 
-# Add EchoMimic v3 as submodule
-echo "📥 Adding EchoMimic v3 submodule..."
-git submodule add https://github.com/antgroup/echomimic_v3.git third_party/echomimic_v3
+# Function to add submodule or clone directly
+add_dependency() {
+    local name=$1
+    local url=$2
+    local path=$3
 
-# Add other submodules as needed
-echo "📥 Adding TTS submodule..."
-# git submodule add https://github.com/coqui-ai/TTS.git third_party/TTS
+    if [ ! -d "$path" ]; then
+        echo "📥 Adding $name..."
+        if git rev-parse --git-dir > /dev/null 2>&1; then
+            # We're in a git repo, use submodules
+            git submodule add "$url" "$path" 2>/dev/null || echo "Submodule $name already exists"
+        else
+            # Not in a git repo, clone directly
+            git clone "$url" "$path"
+        fi
+    else
+        echo "✅ $name already exists"
+    fi
+}
 
-echo "📥 Adding VLLM submodule..."
-# git submodule add https://github.com/vllm-project/vllm.git third_party/vllm
+# Add EchoMimic v3
+add_dependency "EchoMimic v3" "https://github.com/antgroup/echomimic_v3.git" "third_party/echomimic_v3"
 
-echo "📥 Adding Ion SFU submodule..."
-# git submodule add https://github.com/pion/ion-sfu.git third_party/ion-sfu
+# Add other dependencies as needed (uncomment when required)
+# add_dependency "TTS" "https://github.com/coqui-ai/TTS.git" "third_party/TTS"
+# add_dependency "VLLM" "https://github.com/vllm-project/vllm.git" "third_party/vllm"
+# add_dependency "Ion SFU" "https://github.com/pion/ion-sfu.git" "third_party/ion-sfu"
 
 # Initialize and update submodules
 echo "🔄 Initializing submodules..."

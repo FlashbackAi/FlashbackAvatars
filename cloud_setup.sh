@@ -26,6 +26,11 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 echo "📦 Installing remaining dependencies from requirements.txt..."
 pip install -r requirements.txt
 
+# Setup third-party dependencies
+echo "🔗 Setting up third-party dependencies..."
+chmod +x setup_submodules.sh
+./setup_submodules.sh
+
 # Download models
 echo "🎭 Downloading EchoMimic v3 models..."
 python download_models.py
