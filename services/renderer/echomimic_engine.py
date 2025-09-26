@@ -45,7 +45,6 @@ class EchoMimicEngine:
         
         # Set memory optimization environment variables
         if self.low_mem_mode and self.device == "cuda":
-            import os
             os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
             torch.cuda.empty_cache()  # Clear any existing cache
         
