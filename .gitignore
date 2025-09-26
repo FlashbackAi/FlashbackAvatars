@@ -67,7 +67,7 @@ temp/
 
 # Large data files
 # *.wav
-*.mp4
+# *.mp4
 *.avi
 *.mov
 # avatar_input/
