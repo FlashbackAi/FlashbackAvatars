@@ -66,8 +66,8 @@ temp/
 .ipynb_checkpoints/
 
 # Large data files
-*.wav
+# *.wav
 *.mp4
 *.avi
 *.mov
-avatar_input/
+# avatar_input/
