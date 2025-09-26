@@ -45,7 +45,6 @@ pydantic
 numpy
 requests
 tqdm
-pathlib
 
 # Hugging Face Hub (for model uploads)
 huggingface_hub
