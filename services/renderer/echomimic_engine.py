@@ -86,18 +86,25 @@ class EchoMimicEngine:
             print("🔄 Loading transformer...")
             if self.low_mem_mode and self.device == "cuda":
                 torch.cuda.empty_cache()
-                
+
+            # Monitor memory usage
+            if torch.cuda.is_available():
+                mem_before = torch.cuda.memory_allocated() / 1024**3
+                print(f"📊 GPU memory before transformer: {mem_before:.1f}GB")
+
             self.transformer = WanTransformerAudioMask3DModel.from_pretrained(
                 self.model_dir,
-                transformer_additional_kwargs=OmegaConf.to_container(self.cfg['transformer_additional_kwargs']),
+                transformer_additional_kwargs=OmegaConf.to_container(self.cfg.get('transformer_additional_kwargs', {})),
                 torch_dtype=self.weight_dtype,
             ).eval()
-            
+
             if self.device == "cuda":
                 self.transformer = self.transformer.to(self.device)
                 if self.low_mem_mode:
                     torch.cuda.empty_cache()
-                    print(f"   GPU memory after transformer: {torch.cuda.memory_allocated()/1024**3:.2f}GB")
+
+                mem_after = torch.cuda.memory_allocated() / 1024**3
+                print(f"📊 GPU memory after transformer: {mem_after:.1f}GB (+{mem_after-mem_before:.1f}GB)")
     
     def load_vae(self):
         """Load VAE model on demand"""
@@ -205,25 +212,38 @@ class EchoMimicEngine:
     def generate_frame(self, image, audio_array, steps=8, cfg=2.5):
         """Generate frame with lazy loading and memory management"""
         print("🚀 Starting inference with lazy loading...")
-        
+
+        # Aggressive memory cleanup before starting
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
+            initial_mem = torch.cuda.memory_allocated() / 1024**3
+            print(f"📊 Initial GPU memory: {initial_mem:.1f}GB")
+
         # Step 1: Load and process audio
+        print("📊 Step 1: Loading wav2vec...")
         self.load_wav2vec()
         audio_feats = self.audio_proc(audio_array, sampling_rate=16000,
                                       return_tensors="pt").input_values.to(self.device)
-        # Unload wav2vec after processing
+        # Unload wav2vec immediately after processing
         self.unload_model("wav2vec")
-        
+
         # Step 2: Load text encoder (if needed for conditioning)
+        print("📊 Step 2: Loading text encoder...")
         self.load_text_encoder()
-        
+
         # Step 3: Load CLIP encoder for image processing
+        print("📊 Step 3: Loading CLIP encoder...")
         self.load_clip_encoder()
-        
+
         # Step 4: Load core models for generation
+        print("📊 Step 4: Loading transformer...")
         self.load_transformer()
+
+        print("📊 Step 5: Loading VAE...")
         self.load_vae()
-        
-        # Step 5: Create pipeline with all loaded models
+
+        # Step 6: Create pipeline with all loaded models
+        print("📊 Step 6: Creating pipeline...")
         self.create_pipeline()
         
         # Step 6: Run inference
