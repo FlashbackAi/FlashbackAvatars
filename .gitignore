@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+avatar_env/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model files (too large for Git - stored on Hugging Face)
+services/renderer/models/pretrained/
+*.pth
+*.safetensors
+*.bin
+*.ckpt
+
+# Third-party repositories (managed as submodules)
+# third_party/ - managed via git submodules
+
+# Temporary files
+*.tmp
+*.log
+outputs/
+temp/
+
+# Environment variables
+.env
+.env.local
+
+# Cache
+.cache/
+*/.cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Large data files
+*.wav
+*.mp4
+*.avi
+*.mov
+avatar_input/

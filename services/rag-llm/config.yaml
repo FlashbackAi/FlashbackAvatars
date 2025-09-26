@@ -1,0 +1,3 @@
+# Configuration for RAG + vLLM service.
+index_path: /data/index
+corpus_path: /data/corpus

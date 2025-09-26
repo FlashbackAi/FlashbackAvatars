@@ -1,0 +1,70 @@
+version: "3.9"
+services:
+  sfu-gateway:
+    build:
+      context: ..
+      dockerfile: docker/sfu.Dockerfile
+    network_mode: host
+    restart: always
+    environment:
+      - SFU_BIND=${SFU_BIND}
+
+  orchestrator-api:
+    build:
+      context: ..
+      dockerfile: docker/orchestrator.Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - RAG_URL=http://rag-llm:8000
+      - TTS_URL=http://tts:7000
+      - RENDER_URL=http://renderer:9000
+      - TARGET_FPS=${TARGET_FPS}
+      - BUFFER_SECONDS=${BUFFER_SECONDS}
+      - STYLE_PROMPT=${STYLE_PROMPT}
+      - STYLE_CFG=${STYLE_CFG}
+    depends_on:
+      - sfu-gateway
+      - rag-llm
+      - tts
+      - renderer
+
+  rag-llm:
+    build:
+      context: ..
+      dockerfile: docker/rag.Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - rag_index:/data/index
+      - ../corpus:/data/corpus
+
+  tts:
+    build:
+      context: ..
+      dockerfile: docker/tts.Dockerfile
+    ports:
+      - "7000:7000"
+    volumes:
+      - voices:/app/voices
+
+  renderer:
+    build:
+      context: ..
+      dockerfile: docker/renderer.Dockerfile
+    ports:
+      - "9000:9000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities:
+                - gpu
+    volumes:
+      - models:/app/services/renderer/models
+      - ../third_party/echomimic_v3:/app/third_party/echomimic_v3:ro
+
+volumes:
+  rag_index: {}
+  voices: {}
+  models: {}
