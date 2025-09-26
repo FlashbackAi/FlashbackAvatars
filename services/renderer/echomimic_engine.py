@@ -32,6 +32,12 @@ class EchoMimicEngine:
         self.weight_dtype = torch.float16 if self.device == "cuda" else torch.float32
         print(f"📱 Device: {self.device}, Data type: {self.weight_dtype}")
 
+        # Set memory optimization for large models
+        if self.device == "cuda":
+            os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+            torch.cuda.empty_cache()
+            print(f"🧠 Initial GPU memory: {torch.cuda.memory_allocated()/1024**3:.1f}GB")
+
         # Load configuration
         config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'third_party', 'echomimic_v3', 'config', 'config.yaml')
         try:
@@ -50,22 +56,34 @@ class EchoMimicEngine:
 
         # Load transformer
         print("🔄 Loading transformer...")
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
         self.transformer = WanTransformerAudioMask3DModel.from_pretrained(
             model_dir,
             transformer_additional_kwargs=OmegaConf.to_container(cfg['transformer_additional_kwargs']),
             torch_dtype=self.weight_dtype,
         ).eval().to(self.device)
+        if self.device == "cuda":
+            print(f"🧠 After transformer: {torch.cuda.memory_allocated()/1024**3:.1f}GB")
+            torch.cuda.empty_cache()
 
         # Load VAE - the path points directly to the .pth file
         print("🔄 Loading VAE...")
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
         vae_path = os.path.join(model_dir, cfg['vae_kwargs'].get('vae_subpath', 'Wan2.1_VAE.pth'))
         self.vae = AutoencoderKLWan.from_pretrained(
             vae_path,
             additional_kwargs=OmegaConf.to_container(cfg['vae_kwargs']),
         ).to(self.weight_dtype).to(self.device).eval()
+        if self.device == "cuda":
+            print(f"🧠 After VAE: {torch.cuda.memory_allocated()/1024**3:.1f}GB")
+            torch.cuda.empty_cache()
 
         # Load tokenizer and text encoder
         print("🔄 Loading text encoder...")
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
         tokenizer_path = cfg['text_encoder_kwargs'].get('tokenizer_subpath', 'google/umt5-xxl')
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
 
@@ -75,13 +93,21 @@ class EchoMimicEngine:
             additional_kwargs=OmegaConf.to_container(cfg['text_encoder_kwargs']),
             torch_dtype=self.weight_dtype,
         ).eval().to(self.device)
+        if self.device == "cuda":
+            print(f"🧠 After text encoder: {torch.cuda.memory_allocated()/1024**3:.1f}GB")
+            torch.cuda.empty_cache()
 
         # Load CLIP image encoder - the path points directly to the .pth file
         print("🔄 Loading CLIP image encoder...")
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
         image_encoder_path = os.path.join(model_dir, cfg['image_encoder_kwargs'].get('image_encoder_subpath', 'models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth'))
         self.clip_image_encoder = CLIPModel.from_pretrained(
             image_encoder_path,
         ).to(self.weight_dtype).to(self.device).eval()
+        if self.device == "cuda":
+            print(f"🧠 After CLIP: {torch.cuda.memory_allocated()/1024**3:.1f}GB")
+            torch.cuda.empty_cache()
 
         # Load scheduler
         self.scheduler = FlowMatchEulerDiscreteScheduler(**filter_kwargs(FlowMatchEulerDiscreteScheduler, OmegaConf.to_container(cfg['scheduler_kwargs'])))
