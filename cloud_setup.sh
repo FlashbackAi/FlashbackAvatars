@@ -30,14 +30,6 @@ pip install omegaconf einops safetensors timm tomesd torchdiffeq torchsde decord
 echo "🌐 Installing web server dependencies..."
 pip install fastapi uvicorn
 
-# Clone repository (if not already present)
-if [ ! -d "FlashbackAvatars" ]; then
-    echo "📥 Cloning FlashbackAvatars repository..."
-    git clone https://github.com/FlashbackAi/FlashbackAvatars.git
-fi
-
-cd FlashbackAvatars
-
 # Download models
 echo "🎭 Downloading EchoMimic v3 models..."
 python download_models.py
