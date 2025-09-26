@@ -24,12 +24,12 @@ class EchoMimicEngine:
                 gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3  # GB
                 print(f"🚀 Using GPU: {torch.cuda.get_device_name()} ({gpu_memory:.1f}GB)")
                 
-                # Enable low memory mode for GPUs with < 12GB
-                if gpu_memory < 12 and low_mem_mode:
-                    print("⚡ Enabling low memory optimizations for <12GB GPU")
-                    self.low_mem_mode = True
+                # Use the provided low_mem_mode setting
+                self.low_mem_mode = low_mem_mode
+                if self.low_mem_mode:
+                    print("⚡ Low memory optimizations enabled")
                 else:
-                    self.low_mem_mode = False
+                    print("🚀 Full memory mode enabled")
                     
                 self.device = "cuda"
             else:
