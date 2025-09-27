@@ -47,7 +47,7 @@ services/renderer/models/pretrained/
 
 # Third-party repositories (managed as submodules)
 # third_party/ - managed via git submodules
-
+third_party/
 # Temporary files
 *.tmp
 *.log

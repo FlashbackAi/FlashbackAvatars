@@ -126,21 +126,26 @@ class EchoMimicEngine:
         # Load Wav2Vec models
         print("🔄 Loading Wav2Vec...")
         self.audio_proc = Wav2Vec2Processor.from_pretrained(wav2vec_dir)
-        self.wav2vec_model = Wav2Vec2Model.from_pretrained(wav2vec_dir).eval()
+        self.wav2vec_model = Wav2Vec2Model.from_pretrained(wav2vec_dir).eval().to(self.device)
         self.wav2vec_model.requires_grad_(False)
 
         print("✅ EchoMimic engine initialized successfully!")
 
     def generate_frame(self, image, audio_array, steps=8, cfg=2.5):
-        # preprocess audio
+        # Process audio with Wav2Vec model to get embeddings
         audio_feats = self.audio_proc(audio_array, sampling_rate=16000,
                                       return_tensors="pt").input_values.to(self.device)
+
+        # Get audio embeddings from Wav2Vec model
+        with torch.no_grad():
+            audio_embeds = self.wav2vec_model(audio_feats).last_hidden_state
+
         prompt = "cinematic portrait, soft studio key light, shallow depth of field, filmic color"
         with torch.no_grad():
             out = self.pipe(
                 prompt=prompt,
                 clip_image=image,
-                audio_embeds=audio_feats,
+                audio_embeds=audio_embeds,
                 num_inference_steps=steps,
                 guidance_scale=cfg,
                 audio_guidance_scale=cfg,
@@ -153,9 +158,13 @@ class EchoMimicEngine:
         """Generate video with audio-driven animation using EchoMimic v3"""
         print(f"🎬 Generating video from reference image with audio")
 
-        # preprocess audio
+        # Process audio with Wav2Vec model to get embeddings
         audio_feats = self.audio_proc(audio_array, sampling_rate=16000,
                                       return_tensors="pt").input_values.to(self.device)
+
+        # Get audio embeddings from Wav2Vec model
+        with torch.no_grad():
+            audio_embeds = self.wav2vec_model(audio_feats).last_hidden_state
 
         # EchoMimic v3 generates video from single reference image + audio
         prompt = "cinematic portrait, soft studio key light, shallow depth of field, filmic color"
@@ -163,7 +172,7 @@ class EchoMimicEngine:
             out = self.pipe(
                 prompt=prompt,  # Style prompt for video generation
                 clip_image=reference_image,  # Reference image for identity/appearance
-                audio_embeds=audio_feats,  # Audio embeddings for lip-sync and expression
+                audio_embeds=audio_embeds,  # Processed audio embeddings for lip-sync
                 num_inference_steps=steps,
                 guidance_scale=cfg,
                 audio_guidance_scale=cfg,  # Use same guidance for audio
