@@ -174,7 +174,6 @@ class EchoMimicEngine:
         img_width = reference_image.width if hasattr(reference_image, 'width') else 720
 
         # Create a simple mask (you may need to implement proper face detection later)
-        import torch
         coords = (0, img_height//16, 0, img_width//16, img_height//16, img_width//16)
         # Simple mask - covers the whole image
         ip_mask = torch.ones((1, img_height//16, img_width//16), dtype=self.weight_dtype, device=self.device)
