@@ -14,6 +14,7 @@ from src.wan_text_encoder import WanT5EncoderModel
 from src.wan_transformer3d_audio import WanTransformerAudioMask3DModel
 from src.pipeline_wan_fun_inpaint_audio import WanFunInpaintAudioPipeline
 from src.utils import filter_kwargs, get_image_to_video_latent3
+from src.face_detect import get_mask_coord
 
 class EchoMimicEngine:
     def __init__(self, model_dir, wav2vec_dir, device="auto"):
@@ -169,13 +170,52 @@ class EchoMimicEngine:
         # EchoMimic v3 generates video from single reference image + audio
         prompt = "cinematic portrait, soft studio key light, shallow depth of field, filmic color"
 
-        # Get image dimensions
-        img_height = reference_image.height if hasattr(reference_image, 'height') else 480
-        img_width = reference_image.width if hasattr(reference_image, 'width') else 720
+        # Save reference image temporarily for face detection
+        import tempfile
+        temp_image_path = "/tmp/temp_reference.jpg"
+        reference_image.save(temp_image_path)
+
+        # Get face detection coordinates
+        try:
+            face_coords = get_mask_coord(temp_image_path)
+            if face_coords is not None:
+                y1, y2, x1, x2, h_, w_ = face_coords
+                print(f"🔍 Face detected at: y1={y1}, y2={y2}, x1={x1}, x2={x2}")
+            else:
+                # Use full image if no face detected
+                print("⚠️ No face detected, using full image")
+                y1, y2, x1, x2 = 0, reference_image.height, 0, reference_image.width
+                h_, w_ = reference_image.height, reference_image.width
+        except Exception as e:
+            print(f"⚠️ Face detection failed: {e}, using full image")
+            y1, y2, x1, x2 = 0, reference_image.height, 0, reference_image.width
+            h_, w_ = reference_image.height, reference_image.width
+
+        # Calculate sample size and downratio like in original app.py
+        import math
+        img_height = reference_image.height
+        img_width = reference_image.width
+        sample_size = [img_height, img_width]
+
+        downratio = math.sqrt(img_height * img_width / h_ / w_)
+        coords = (
+            y1 * downratio // 16, y2 * downratio // 16,
+            x1 * downratio // 16, x2 * downratio // 16,
+            img_height // 16, img_width // 16,
+        )
+
+        # Create proper IP mask
+        def get_ip_mask(coords):
+            y1, y2, x1, x2, h, w = coords
+            mask = torch.zeros((h, w), dtype=self.weight_dtype)
+            mask[int(y1):int(y2), int(x1):int(x2)] = 1.0
+            return mask
+
+        ip_mask = get_ip_mask(coords).unsqueeze(0)
+        ip_mask = torch.cat([ip_mask]*3).to(device=self.device, dtype=self.weight_dtype)
 
         # Use EchoMimic's proper image processing
         video_length = 49  # Default frame count
-        sample_size = [img_height, img_width]
 
         # Process the reference image using EchoMimic's utility function
         _, _, clip_image = get_image_to_video_latent3(
@@ -183,11 +223,6 @@ class EchoMimicEngine:
             video_length=video_length,
             sample_size=sample_size
         )
-
-        # Create a simple mask (you may need to implement proper face detection later)
-        # Simple mask - covers the whole image
-        ip_mask = torch.ones((1, img_height//16, img_width//16), dtype=self.weight_dtype, device=self.device)
-        ip_mask = torch.cat([ip_mask]*3)  # RGB channels
 
         with torch.no_grad():
             out = self.pipe(
