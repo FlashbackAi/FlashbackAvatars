@@ -137,12 +137,15 @@ class EchoMimicEngine:
                                       return_tensors="pt").input_values.to(self.device)
         with torch.no_grad():
             out = self.pipe(
-                image=image,
-                audio_features=audio_feats,
+                clip_image=image,
+                audio_embeds=audio_feats,
                 num_inference_steps=steps,
-                guidance_scale=cfg
+                guidance_scale=cfg,
+                audio_guidance_scale=cfg,
+                num_frames=1,  # Single frame
+                output_type="numpy"
             )
-        return out.images[0]
+        return out.images[0] if hasattr(out, 'images') else out.frames[0]
 
     def generate_video(self, video_frames, reference_image, audio_array, steps=8, cfg=2.5):
         """Generate video with audio-driven animation using EchoMimic v3"""
@@ -155,13 +158,16 @@ class EchoMimicEngine:
         # EchoMimic v3 generates video from single reference image + audio
         with torch.no_grad():
             out = self.pipe(
-                image=reference_image,  # Reference image for identity/appearance
-                audio_features=audio_feats,  # Audio for lip-sync and expression
+                clip_image=reference_image,  # Reference image for identity/appearance
+                audio_embeds=audio_feats,  # Audio embeddings for lip-sync and expression
                 num_inference_steps=steps,
                 guidance_scale=cfg,
-                # Additional parameters for video generation
-                height=reference_image.height if hasattr(reference_image, 'height') else 512,
-                width=reference_image.width if hasattr(reference_image, 'width') else 512,
+                audio_guidance_scale=cfg,  # Use same guidance for audio
+                # Video generation parameters
+                height=reference_image.height if hasattr(reference_image, 'height') else 480,
+                width=reference_image.width if hasattr(reference_image, 'width') else 720,
+                num_frames=49,  # Default frame count for EchoMimic v3
+                output_type="numpy"
             )
 
         # Return the generated video frames
