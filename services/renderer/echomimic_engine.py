@@ -13,7 +13,7 @@ from src.wan_image_encoder import CLIPModel
 from src.wan_text_encoder import WanT5EncoderModel
 from src.wan_transformer3d_audio import WanTransformerAudioMask3DModel
 from src.pipeline_wan_fun_inpaint_audio import WanFunInpaintAudioPipeline
-from src.utils import filter_kwargs
+from src.utils import filter_kwargs, get_image_to_video_latent3
 
 class EchoMimicEngine:
     def __init__(self, model_dir, wav2vec_dir, device="auto"):
@@ -173,8 +173,18 @@ class EchoMimicEngine:
         img_height = reference_image.height if hasattr(reference_image, 'height') else 480
         img_width = reference_image.width if hasattr(reference_image, 'width') else 720
 
+        # Use EchoMimic's proper image processing
+        video_length = 49  # Default frame count
+        sample_size = [img_height, img_width]
+
+        # Process the reference image using EchoMimic's utility function
+        _, _, clip_image = get_image_to_video_latent3(
+            reference_image, None,
+            video_length=video_length,
+            sample_size=sample_size
+        )
+
         # Create a simple mask (you may need to implement proper face detection later)
-        coords = (0, img_height//16, 0, img_width//16, img_height//16, img_width//16)
         # Simple mask - covers the whole image
         ip_mask = torch.ones((1, img_height//16, img_width//16), dtype=self.weight_dtype, device=self.device)
         ip_mask = torch.cat([ip_mask]*3)  # RGB channels
@@ -186,7 +196,7 @@ class EchoMimicEngine:
                 negative_prompt="bad quality, distorted face, blurry",
                 audio_embeds=audio_embeds,  # Processed audio embeddings for lip-sync
                 audio_scale=cfg,  # Audio guidance scale
-                clip_image=reference_image,  # Reference image for identity
+                clip_image=clip_image,  # Processed reference image for identity
                 ip_mask=ip_mask,  # Image mask
                 use_un_ip_mask=False,  # Don't use inverted mask
                 height=img_height,
