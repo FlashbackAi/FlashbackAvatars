@@ -40,16 +40,16 @@ echo "⚙️ Setting up environment..."
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # Test GPU memory
-echo "🧪 Testing GPU setup..."
-python -c "
-import torch
-print(f'CUDA available: {torch.cuda.is_available()}')
-if torch.cuda.is_available():
-    print(f'GPU: {torch.cuda.get_device_name()}')
-    print(f'Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB')
-"
+# echo "🧪 Testing GPU setup..."
+# python -c "
+# import torch
+# print(f'CUDA available: {torch.cuda.is_available()}')
+# if torch.cuda.is_available():
+#     print(f'GPU: {torch.cuda.get_device_name()}')
+#     print(f'Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB')
+# "
 
-echo "✅ Setup complete! Ready for EchoMimic v3 development"
+# echo "✅ Setup complete! Ready for EchoMimic v3 development"
 echo ""
 echo "🚀 To start the server:"
 echo "cd FlashbackAvatars/services/renderer"
