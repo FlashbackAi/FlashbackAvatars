@@ -168,18 +168,33 @@ class EchoMimicEngine:
 
         # EchoMimic v3 generates video from single reference image + audio
         prompt = "cinematic portrait, soft studio key light, shallow depth of field, filmic color"
+
+        # Get image dimensions
+        img_height = reference_image.height if hasattr(reference_image, 'height') else 480
+        img_width = reference_image.width if hasattr(reference_image, 'width') else 720
+
+        # Create a simple mask (you may need to implement proper face detection later)
+        import torch
+        coords = (0, img_height//16, 0, img_width//16, img_height//16, img_width//16)
+        # Simple mask - covers the whole image
+        ip_mask = torch.ones((1, img_height//16, img_width//16), dtype=self.weight_dtype, device=self.device)
+        ip_mask = torch.cat([ip_mask]*3)  # RGB channels
+
         with torch.no_grad():
             out = self.pipe(
-                prompt=prompt,  # Style prompt for video generation
-                clip_image=reference_image,  # Reference image for identity/appearance
+                prompt,  # Style prompt for video generation
+                num_frames=49,  # Default frame count for EchoMimic v3
+                negative_prompt="bad quality, distorted face, blurry",
                 audio_embeds=audio_embeds,  # Processed audio embeddings for lip-sync
+                audio_scale=cfg,  # Audio guidance scale
+                clip_image=reference_image,  # Reference image for identity
+                ip_mask=ip_mask,  # Image mask
+                use_un_ip_mask=False,  # Don't use inverted mask
+                height=img_height,
+                width=img_width,
                 num_inference_steps=steps,
                 guidance_scale=cfg,
-                audio_guidance_scale=cfg,  # Use same guidance for audio
-                # Video generation parameters
-                height=reference_image.height if hasattr(reference_image, 'height') else 480,
-                width=reference_image.width if hasattr(reference_image, 'width') else 720,
-                num_frames=49,  # Default frame count for EchoMimic v3
+                generator=torch.Generator(device=self.device).manual_seed(42),
                 output_type="numpy"
             )
 
