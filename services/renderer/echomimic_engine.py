@@ -170,49 +170,11 @@ class EchoMimicEngine:
         # EchoMimic v3 generates video from single reference image + audio
         prompt = "cinematic portrait, soft studio key light, shallow depth of field, filmic color"
 
-        # Save reference image temporarily for face detection
-        import tempfile
-        temp_image_path = "/tmp/temp_reference.jpg"
-        reference_image.save(temp_image_path)
-
-        # Get face detection coordinates
-        try:
-            face_coords = get_mask_coord(temp_image_path)
-            if face_coords is not None:
-                y1, y2, x1, x2, h_, w_ = face_coords
-                print(f"🔍 Face detected at: y1={y1}, y2={y2}, x1={x1}, x2={x2}")
-            else:
-                # Use full image if no face detected
-                print("⚠️ No face detected, using full image")
-                y1, y2, x1, x2 = 0, reference_image.height, 0, reference_image.width
-                h_, w_ = reference_image.height, reference_image.width
-        except Exception as e:
-            print(f"⚠️ Face detection failed: {e}, using full image")
-            y1, y2, x1, x2 = 0, reference_image.height, 0, reference_image.width
-            h_, w_ = reference_image.height, reference_image.width
-
-        # Calculate sample size and downratio like in original app.py
-        import math
+        # Skip face detection and use simple approach
+        print("🎭 Using simplified pipeline without face detection")
         img_height = reference_image.height
         img_width = reference_image.width
         sample_size = [img_height, img_width]
-
-        downratio = math.sqrt(img_height * img_width / h_ / w_)
-        coords = (
-            y1 * downratio // 16, y2 * downratio // 16,
-            x1 * downratio // 16, x2 * downratio // 16,
-            img_height // 16, img_width // 16,
-        )
-
-        # Create proper IP mask
-        def get_ip_mask(coords):
-            y1, y2, x1, x2, h, w = coords
-            mask = torch.zeros((h, w), dtype=self.weight_dtype)
-            mask[int(y1):int(y2), int(x1):int(x2)] = 1.0
-            return mask
-
-        ip_mask = get_ip_mask(coords).unsqueeze(0)
-        ip_mask = torch.cat([ip_mask]*3).to(device=self.device, dtype=self.weight_dtype)
 
         # Use EchoMimic's proper image processing
         video_length = 49  # Default frame count
@@ -232,8 +194,7 @@ class EchoMimicEngine:
                 audio_embeds=audio_embeds,  # Processed audio embeddings for lip-sync
                 audio_scale=cfg,  # Audio guidance scale
                 clip_image=clip_image,  # Processed reference image for identity
-                ip_mask=ip_mask,  # Image mask
-                use_un_ip_mask=False,  # Don't use inverted mask
+                # Skip ip_mask to avoid face detection requirements
                 height=img_height,
                 width=img_width,
                 num_inference_steps=steps,
