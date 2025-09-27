@@ -4,21 +4,26 @@ from PIL import Image
 import numpy as np
 import cv2
 
-# Load video frames
+# Load video for sample generation
 video_path = "../../avatar_input/vinay_intro.mp4"
+print(f"🎬 Loading video for sample generation: {video_path}")
+
 cap = cv2.VideoCapture(video_path)
-
 frames = []
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
-    # Convert BGR to RGB
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    frames.append(frame)
 
-cap.release()
-print(f"Loaded {len(frames)} frames from video")
+if cap.isOpened():
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        # Convert BGR to RGB
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frames.append(frame)
+    cap.release()
+    print(f"✅ Loaded {len(frames)} frames from video")
+else:
+    print(f"❌ Could not open video file: {video_path}")
+    exit(1)
 
 # Convert to numpy array: (frames, height, width, channels)
 video_array = np.array(frames)

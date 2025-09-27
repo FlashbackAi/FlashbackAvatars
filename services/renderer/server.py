@@ -62,9 +62,29 @@ async def render_frame(request: RenderRequest):
         print(f"🚀 Starting EchoMimic inference...")
         generated_video = engine.generate_video(video_array, first_frame, audio_array)
 
-        # Take first frame from generated video
+        # Save full generated video and return first frame
         if isinstance(generated_video, np.ndarray):
             if len(generated_video.shape) == 4:  # (frames, H, W, C)
+                print(f"📹 Generated video shape: {generated_video.shape}")
+
+                # Save full video using OpenCV
+                import cv2
+                output_path = "generated_avatar_video.mp4"
+                height, width = generated_video.shape[1:3]
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                out_video = cv2.VideoWriter(output_path, fourcc, 15.0, (width, height))
+
+                for frame_idx in range(generated_video.shape[0]):
+                    frame = generated_video[frame_idx]
+                    # Convert from float [0,1] to uint8 [0,255] and RGB to BGR
+                    frame_uint8 = (frame * 255).astype(np.uint8)
+                    frame_bgr = cv2.cvtColor(frame_uint8, cv2.COLOR_RGB2BGR)
+                    out_video.write(frame_bgr)
+
+                out_video.release()
+                print(f"💾 Saved full video: {output_path}")
+
+                # Use first frame for response
                 generated_frame = generated_video[0]
             else:  # assume it's already a single frame
                 generated_frame = generated_video
