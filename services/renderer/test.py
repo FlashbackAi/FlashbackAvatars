@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 
 # Load video frames
-video_path = "../../avatar_input/vinayone.jpg"
+video_path = "../../avatar_input/vinay_intro.mp4"
 cap = cv2.VideoCapture(video_path)
 
 frames = []

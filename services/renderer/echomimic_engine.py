@@ -186,6 +186,30 @@ class EchoMimicEngine:
             sample_size=sample_size
         )
 
+        # Use the actual video from video_frames parameter
+        print(f"🎬 Using actual video with {len(video_frames)} frames")
+
+        # Convert video frames to tensor format expected by EchoMimic v3
+        import torchvision.transforms as transforms
+        transform = transforms.Compose([
+            transforms.Resize((img_height, img_width)),
+            transforms.ToTensor(),
+        ])
+
+        # Convert video frames to tensor: [batch, channels, frames, height, width]
+        frame_tensors = []
+        max_frames = min(len(video_frames), 49)  # Limit to 49 frames for EchoMimic v3
+
+        for i in range(max_frames):
+            # Convert numpy array to PIL Image, then to tensor
+            frame_pil = Image.fromarray(video_frames[i])
+            frame_tensor = transform(frame_pil)
+            frame_tensors.append(frame_tensor)
+
+        # Stack frames: [frames, channels, height, width] -> [1, channels, frames, height, width]
+        initial_video = torch.stack(frame_tensors, dim=1).unsqueeze(0)  # [1, 3, frames, H, W]
+        print(f"📹 Video tensor shape: {initial_video.shape}")
+
         with torch.no_grad():
             out = self.pipe(
                 prompt,  # Style prompt for video generation
@@ -194,7 +218,7 @@ class EchoMimicEngine:
                 audio_embeds=audio_embeds,  # Processed audio embeddings for lip-sync
                 audio_scale=cfg,  # Audio guidance scale
                 clip_image=clip_image,  # Processed reference image for identity
-                # Skip ip_mask to avoid face detection requirements
+                video=initial_video,  # Initial video tensor to avoid 'y' variable error
                 height=img_height,
                 width=img_width,
                 num_inference_steps=steps,
