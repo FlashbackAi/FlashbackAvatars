@@ -135,8 +135,10 @@ class EchoMimicEngine:
         # preprocess audio
         audio_feats = self.audio_proc(audio_array, sampling_rate=16000,
                                       return_tensors="pt").input_values.to(self.device)
+        prompt = "cinematic portrait, soft studio key light, shallow depth of field, filmic color"
         with torch.no_grad():
             out = self.pipe(
+                prompt=prompt,
                 clip_image=image,
                 audio_embeds=audio_feats,
                 num_inference_steps=steps,
@@ -156,8 +158,10 @@ class EchoMimicEngine:
                                       return_tensors="pt").input_values.to(self.device)
 
         # EchoMimic v3 generates video from single reference image + audio
+        prompt = "cinematic portrait, soft studio key light, shallow depth of field, filmic color"
         with torch.no_grad():
             out = self.pipe(
+                prompt=prompt,  # Style prompt for video generation
                 clip_image=reference_image,  # Reference image for identity/appearance
                 audio_embeds=audio_feats,  # Audio embeddings for lip-sync and expression
                 num_inference_steps=steps,
