@@ -177,7 +177,7 @@ class EchoMimicEngine:
         sample_size = [img_height, img_width]
 
         # Use EchoMimic's proper image processing
-        video_length = 49  # Default frame count
+        video_length = 12  # Reduced for fast sample (12 frames ≈ 0.8 seconds at 15 FPS)
 
         # Process the reference image using EchoMimic's utility function
         _, _, clip_image = get_image_to_video_latent3(
@@ -198,7 +198,7 @@ class EchoMimicEngine:
 
         # Convert video frames to tensor: [batch, channels, frames, height, width]
         frame_tensors = []
-        max_frames = min(len(video_frames), 49)  # Limit to 49 frames for EchoMimic v3
+        max_frames = min(len(video_frames), 12)  # Limit to 12 frames for fast sample
 
         for i in range(max_frames):
             # Convert numpy array to PIL Image, then to tensor
@@ -210,18 +210,23 @@ class EchoMimicEngine:
         initial_video = torch.stack(frame_tensors, dim=1).unsqueeze(0)  # [1, 3, frames, H, W]
         print(f"📹 Video tensor shape: {initial_video.shape}")
 
+        # Optimize for speed: lower resolution and fewer steps
+        fast_height = min(img_height, 512)  # Limit height to 512
+        fast_width = min(img_width, 512)   # Limit width to 512
+        fast_steps = 4  # Reduced from 8 to 4 steps for speed
+
         with torch.no_grad():
             out = self.pipe(
                 prompt,  # Style prompt for video generation
-                num_frames=49,  # Default frame count for EchoMimic v3
+                num_frames=12,  # Reduced frame count for fast sample
                 negative_prompt="bad quality, distorted face, blurry",
                 audio_embeds=audio_embeds,  # Processed audio embeddings for lip-sync
                 audio_scale=cfg,  # Audio guidance scale
                 clip_image=clip_image,  # Processed reference image for identity
                 video=initial_video,  # Initial video tensor to avoid 'y' variable error
-                height=img_height,
-                width=img_width,
-                num_inference_steps=steps,
+                height=fast_height,
+                width=fast_width,
+                num_inference_steps=fast_steps,  # Reduced steps for speed
                 guidance_scale=cfg,
                 generator=torch.Generator(device=self.device).manual_seed(42),
                 output_type="numpy"
