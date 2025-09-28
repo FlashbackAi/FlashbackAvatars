@@ -131,6 +131,22 @@ def get_ip_mask(coords):
 def main():
     print("🎬 Starting EchoMimic v3 test with your video/audio...")
 
+    # Configure TensorFlow for Blackwell GPU compatibility
+    os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+    os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
+    os.environ['XLA_FLAGS'] = '--xla_gpu_cuda_data_dir=/usr/local/cuda'
+
+    # Import tensorflow and configure GPU
+    import tensorflow as tf
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        try:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            print(f"✅ Configured {len(gpus)} GPU(s) for TensorFlow")
+        except RuntimeError as e:
+            print(f"⚠️  GPU configuration warning: {e}")
+
     config = Config()
 
     # Check input files exist
