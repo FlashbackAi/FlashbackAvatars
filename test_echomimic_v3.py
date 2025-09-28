@@ -210,8 +210,12 @@ def main():
     print("🖼️ Extracting reference image from video...")
     ref_img = extract_first_frame_from_video(config.input_video)
 
-    # Get face mask coordinates
-    y1, y2, x1, x2, h_, w_ = get_mask_coord(config.input_video)
+    # Save reference image temporarily for face detection
+    temp_image_path = "temp_reference_frame.jpg"
+    ref_img.save(temp_image_path)
+
+    # Get face mask coordinates from the extracted frame
+    y1, y2, x1, x2, h_, w_ = get_mask_coord(temp_image_path)
 
     # Extract audio features
     print("🎵 Processing audio...")
@@ -285,6 +289,11 @@ def main():
     audio_clip = audio_clip.subclipped(0, video_length / config.fps)
     final_clip = video_clip.with_audio(audio_clip)
     final_clip.write_videofile(video_audio_path, codec="libx264", audio_codec="aac")
+
+    # Cleanup temporary files
+    import os
+    if os.path.exists("temp_reference_frame.jpg"):
+        os.remove("temp_reference_frame.jpg")
 
     print(f"✅ Generated avatar video: {video_audio_path}")
     print(f"📊 Video info: {video_length} frames, {sample_height}x{sample_width}, {config.fps} FPS")
