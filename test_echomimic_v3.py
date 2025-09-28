@@ -48,8 +48,8 @@ class Config:
         self.save_path = "outputs"
 
         # Generation settings (optimized for H100 GPU - high quality)
-        self.num_inference_steps = 25  # Higher quality diffusion
-        self.partial_video_length = 250  # Full length (~4.5 seconds at 25fps)
+        self.num_inference_steps = 20  # Higher quality diffusion
+        self.partial_video_length = 180  # Full length (~4.5 seconds at 25fps)
         self.guidance_scale = 6.0  # Stronger text guidance for styling
         self.audio_guidance_scale = 3.0  # Stronger audio guidance
         self.seed = 42
