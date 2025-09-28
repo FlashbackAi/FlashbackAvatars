@@ -24,6 +24,7 @@ albumentations
 imageio[ffmpeg]
 pillow
 moviepy==2.2.1
+retinaface
 
 # Audio processing
 librosa

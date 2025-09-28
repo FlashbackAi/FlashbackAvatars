@@ -29,7 +29,7 @@ else:
 video_array = np.array(frames)
 
 # Test with sample audio (you can use any WAV file)
-audio_file = "../../vinay_audio.wav"
+audio_file = "../../avatar_input/vinay_audio.wav"
 
 # Send to renderer
 response = requests.post("http://localhost:9000/render",
