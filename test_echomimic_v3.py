@@ -131,15 +131,22 @@ def get_ip_mask(coords):
 def main():
     print("🎬 Starting EchoMimic v3 test with your video/audio...")
 
-    # Configure TensorFlow for Blackwell GPU compatibility
+    # Configure CUDA and TensorFlow for Blackwell GPU compatibility
     os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
     os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'  # Show all logs
-    os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # Disable OneDNN optimizations
-    os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'
 
-    # Force TensorFlow to use older CUDA compute capabilities that work
-    os.environ['TF_CUDA_COMPUTE_CAPABILITIES'] = '8.0,8.6,8.9,9.0'
+    # Critical: Force CUDA to use compatibility mode for Blackwell
+    os.environ['CUDA_FORCE_PTX_JIT'] = '1'
+    os.environ['CUDA_CACHE_DISABLE'] = '0'
+    os.environ['CUDA_CACHE_MAXSIZE'] = '2147483647'  # Max cache size
+
+    # Force TensorFlow to build kernels for older compute capability
+    os.environ['TF_CUDA_COMPUTE_CAPABILITIES'] = '8.6'  # Single stable target
+    os.environ['NVIDIA_TF32_OVERRIDE'] = '0'  # Disable TF32 for compatibility
+
+    # Set CUDA device order to PCI_BUS_ID for consistency
+    os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 
     # Import tensorflow and configure GPU
     import tensorflow as tf
