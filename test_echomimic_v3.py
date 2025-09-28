@@ -134,18 +134,41 @@ def main():
     # Configure TensorFlow for Blackwell GPU compatibility
     os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
     os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
-    os.environ['XLA_FLAGS'] = '--xla_gpu_cuda_data_dir=/usr/local/cuda'
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'  # Show all logs
+    os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # Disable OneDNN optimizations
+    os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
+
+    # Force TensorFlow to use older CUDA compute capabilities that work
+    os.environ['TF_CUDA_COMPUTE_CAPABILITIES'] = '8.0,8.6,8.9,9.0'
 
     # Import tensorflow and configure GPU
     import tensorflow as tf
+
+    # Try to configure GPU memory and compute capability
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
         try:
             for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
-            print(f"✅ Configured {len(gpus)} GPU(s) for TensorFlow")
+                # Try to set virtual GPU with lower compute capability
+                tf.config.experimental.set_virtual_device_configuration(
+                    gpu,
+                    [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=8192)]
+                )
+            print(f"✅ Configured {len(gpus)} GPU(s) for TensorFlow with compatibility mode")
         except RuntimeError as e:
             print(f"⚠️  GPU configuration warning: {e}")
+
+        # Test basic TensorFlow GPU operation
+        try:
+            with tf.device('/GPU:0'):
+                a = tf.constant([[1.0, 2.0], [3.0, 4.0]])
+                b = tf.constant([[1.0, 1.0], [0.0, 1.0]])
+                c = tf.matmul(a, b)
+            print("✅ TensorFlow GPU test successful")
+        except Exception as e:
+            print(f"❌ TensorFlow GPU test failed: {e}")
+            raise e
 
     config = Config()
 
