@@ -25,7 +25,7 @@ imageio[ffmpeg]
 pillow
 moviepy==2.2.1
 retina-face  # Imports as 'from retinaface import RetinaFace'
-tensorflow>=2.15.0 
+tensorflow==2.15.0  # TensorFlow 2.16+ supports compute capability 12.0 (Blackwell) 
 
 # Audio processing
 librosa
