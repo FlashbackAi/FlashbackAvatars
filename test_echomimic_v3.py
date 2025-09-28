@@ -131,52 +131,6 @@ def get_ip_mask(coords):
 def main():
     print("🎬 Starting EchoMimic v3 test with your video/audio...")
 
-    # Configure CUDA and TensorFlow for Blackwell GPU compatibility
-    os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-    os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'
-
-    # Critical: Force CUDA to use compatibility mode for Blackwell
-    os.environ['CUDA_FORCE_PTX_JIT'] = '1'
-    os.environ['CUDA_CACHE_DISABLE'] = '0'
-    os.environ['CUDA_CACHE_MAXSIZE'] = '2147483647'  # Max cache size
-
-    # Force TensorFlow to build kernels for older compute capability
-    os.environ['TF_CUDA_COMPUTE_CAPABILITIES'] = '8.6'  # Single stable target
-    os.environ['NVIDIA_TF32_OVERRIDE'] = '0'  # Disable TF32 for compatibility
-
-    # Set CUDA device order to PCI_BUS_ID for consistency
-    os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-
-    # Import tensorflow and configure GPU
-    import tensorflow as tf
-
-    # Try to configure GPU memory and compute capability
-    gpus = tf.config.experimental.list_physical_devices('GPU')
-    if gpus:
-        try:
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
-                # Try to set virtual GPU with lower compute capability
-                tf.config.experimental.set_virtual_device_configuration(
-                    gpu,
-                    [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=8192)]
-                )
-            print(f"✅ Configured {len(gpus)} GPU(s) for TensorFlow with compatibility mode")
-        except RuntimeError as e:
-            print(f"⚠️  GPU configuration warning: {e}")
-
-        # Test basic TensorFlow GPU operation
-        try:
-            with tf.device('/GPU:0'):
-                a = tf.constant([[1.0, 2.0], [3.0, 4.0]])
-                b = tf.constant([[1.0, 1.0], [0.0, 1.0]])
-                c = tf.matmul(a, b)
-            print("✅ TensorFlow GPU test successful")
-        except Exception as e:
-            print(f"❌ TensorFlow GPU test failed: {e}")
-            raise e
-
     config = Config()
 
     # Check input files exist
