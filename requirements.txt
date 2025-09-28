@@ -24,7 +24,8 @@ albumentations
 imageio[ffmpeg]
 pillow
 moviepy==2.2.1
-retinaface
+retina-face  # Imports as 'from retinaface import RetinaFace'
+tensorflow>=2.15.0 
 
 # Audio processing
 librosa
@@ -36,7 +37,6 @@ beautifulsoup4
 ftfy
 func_timeout
 onnxruntime
-retina-face==0.0.17
 
 # Web server and API
 fastapi
