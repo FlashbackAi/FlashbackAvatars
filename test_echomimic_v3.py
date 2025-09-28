@@ -291,7 +291,6 @@ def main():
     final_clip.write_videofile(video_audio_path, codec="libx264", audio_codec="aac")
 
     # Cleanup temporary files
-    import os
     if os.path.exists("temp_reference_frame.jpg"):
         os.remove("temp_reference_frame.jpg")
 
