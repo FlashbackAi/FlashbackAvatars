@@ -47,33 +47,33 @@ class Config:
         # Output
         self.save_path = "outputs"
 
-        # Generation settings (optimized for H100 GPU - high quality)
-        self.num_inference_steps = 20  # Higher quality diffusion
-        self.partial_video_length = 180  # Full length (~4.5 seconds at 25fps)
-        self.guidance_scale = 6.0  # Stronger text guidance for styling
-        self.audio_guidance_scale = 3.0  # Stronger audio guidance
+        # Generation settings (optimized for quality over length)
+        self.num_inference_steps = 25  # Higher quality diffusion
+        self.partial_video_length = 73  # Medium length (~3 seconds at 25fps)
+        self.guidance_scale = 4.5  # Balanced text guidance for styling
+        self.audio_guidance_scale = 2.8  # Balanced audio guidance
         self.seed = 42
 
-        # Enhanced professional styling prompt - black turtle neck in robotic lab
-        self.prompt = "hyper-realistic professional tech executive wearing sleek black turtle neck sweater, standing in futuristic robotic laboratory with advanced AI robots and holographic displays, dramatic cinematic lighting with key light and rim light, ultra-sharp focus, photorealistic skin texture, premium studio photography, modern minimalist tech aesthetic, 8K quality"
-        self.negative_prompt = "blurry, low quality, distorted, amateur, bad lighting, casual clothing, messy background, unprofessional, poor posture, bad composition, pixelated, artifacts, oversaturated, cartoon, anime, painting, sketch"
+        # Refined professional styling prompt - focused and clear
+        self.prompt = "professional business portrait, person wearing elegant black turtleneck sweater, modern minimalist office background with subtle technology elements, professional studio lighting, clean sharp focus, high quality photograph, business executive style"
+        self.negative_prompt = "blurry, low quality, distorted, amateur lighting, casual clothes, messy background, cartoon, anime, painting, oversaturated, artifacts, pixelated"
 
-        # Model settings (optimized for H100)
+        # Model settings (balanced for quality)
         self.weight_dtype = torch.bfloat16
-        self.sample_size = [768, 768]  # Higher resolution for H100
+        self.sample_size = [512, 512]  # Optimal resolution for stability
         self.fps = 25
 
-        # Pipeline settings (enhanced for styling)
-        self.sampler_name = "Flow_DPM++"  # Better quality sampler
-        self.audio_scale = 1.2  # Slightly higher for better lip-sync
+        # Pipeline settings (optimized for stability)
+        self.sampler_name = "Flow"  # Most stable sampler
+        self.audio_scale = 1.0  # Standard audio scaling
         self.shift = 5.0
         self.use_dynamic_cfg = True
         self.use_dynamic_acfg = True
 
-        # Advanced styling settings
-        self.neg_scale = 2.0  # Stronger negative guidance
-        self.neg_steps = 3  # More negative guidance steps
-        self.cfg_skip_ratio = 0.1  # Skip some CFG for speed while maintaining quality
+        # Balanced styling settings
+        self.neg_scale = 1.5  # Moderate negative guidance
+        self.neg_steps = 2  # Standard negative guidance steps
+        self.cfg_skip_ratio = 0.0  # No CFG skipping for maximum quality
 
 
 def extract_first_frame_from_video(video_path):
