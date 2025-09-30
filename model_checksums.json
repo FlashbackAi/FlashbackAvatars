@@ -1,1 +1,12 @@
-{}
+{
+  "LICENSE.txt": "86d3f3a95c324c9479bd8986968f4327",
+  "config.json": "7de2ed623781cf01bc4b3a44135c30f3",
+  "Wan2.1_VAE.pth": "854fcb755005951fa5b329799af6199f",
+  "models_t5_umt5-xxl-enc-bf16.pth": "baabe26be91ea1c57aea2e3f3c03f19d",
+  "models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth": "16b9c6c568833b18762664925a58e05c",
+  "transformer/diffusion_pytorch_model.safetensors": "cbc7803ad07ad42ccad0d36ccca7ee6b",
+  "google/umt5-xxl/special_tokens_map.json": "22b363395e0fe3791a25343a20003cd8",
+  "google/umt5-xxl/spiece.model": "1bc90d6208a46789d8d1b38fa5052396",
+  "google/umt5-xxl/tokenizer.json": "f398ea1cc7c27993019170d1c0d49b9c",
+  "google/umt5-xxl/tokenizer_config.json": "a4db993ed366b41647a514afe5561e56"
+}

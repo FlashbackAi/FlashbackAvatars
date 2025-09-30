@@ -37,7 +37,7 @@ class Config:
         # Paths
         self.config_path = "third_party/echomimic_v3/config/config.yaml"
         self.model_name = "third_party/echomimic_v3/models/Wan2.1-Fun-V1.1-1.3B-InP"
-        self.transformer_path = "third_party/echomimic_v3/models/transformer/diffusion_pytorch_model.safetensors"
+        self.transformer_path = "third_party/echomimic_v3/models/transformers/diffusion_pytorch_model.safetensors"
         self.wav2vec_model_dir = "third_party/echomimic_v3/models/wav2vec2-base-960h"
 
         # Input files (your video and audio)

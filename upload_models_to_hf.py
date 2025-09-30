@@ -64,12 +64,11 @@ def upload_models():
         print(f"❌ Model directory not found: {main_model_dir}")
         return False
     
-    # Files to upload with their paths
+    # Files to upload with their paths (excluding transformer model)
     files_to_upload = [
         "LICENSE.txt",
-        "config.json", 
+        "config.json",
         "Wan2.1_VAE.pth",
-        "diffusion_pytorch_model.safetensors",
         "models_t5_umt5-xxl-enc-bf16.pth",
         "models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth"
     ]
@@ -122,7 +121,46 @@ def upload_models():
         except Exception as e:
             print(f"   ❌ Upload failed: {e}")
             return False
-    
+
+    # Upload transformer model to separate directory
+    transformer_file = "diffusion_pytorch_model.safetensors"
+    transformer_filepath = main_model_dir / transformer_file
+    transformer_path_in_repo = f"models/transformer/{transformer_file}"
+
+    if transformer_filepath.exists():
+        # Force upload to new location (even if it exists in old location)
+        print(f"🔄 Moving {transformer_file} to models/transformer/ directory...")
+
+        # Check if file already exists in NEW location
+        if check_file_exists_on_hf(api, repo_id, transformer_path_in_repo):
+            print(f"✅ {transformer_file} already exists in transformer directory, skipping...")
+        else:
+            file_size = transformer_filepath.stat().st_size / (1024**3)  # GB
+            print(f"📤 Uploading {transformer_file} to models/transformer/ ({file_size:.2f} GB)...")
+
+            # Calculate MD5
+            print("   Calculating checksum...")
+            md5_hash = calculate_md5(transformer_filepath)
+            checksums[f"transformer/{transformer_file}"] = md5_hash
+            print(f"   MD5: {md5_hash}")
+
+            try:
+                # Upload to HF in transformer directory
+                upload_file(
+                    path_or_fileobj=str(transformer_filepath),
+                    path_in_repo=transformer_path_in_repo,
+                    repo_id=repo_id,
+                    token=token,
+                    commit_message=f"Upload transformer model {transformer_file}"
+                )
+                print(f"   ✅ Uploaded successfully to models/transformer/")
+
+            except Exception as e:
+                print(f"   ❌ Transformer upload failed: {e}")
+                return False
+    else:
+        print(f"⚠️  Transformer file not found: {transformer_file}")
+
     # Upload tokenizer files
     for filename in tokenizer_files:
         filepath = main_model_dir / filename

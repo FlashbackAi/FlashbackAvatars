@@ -52,9 +52,9 @@ def verify_checksum(filepath, expected_md5):
 
 def download_echomimic_models():
     """Download EchoMimic v3 models"""
-    
+
     base_dir = Path(__file__).parent
-    models_dir = base_dir / "services" / "renderer" / "models" / "pretrained"
+    models_dir = base_dir / "third_party" / "echomimic_v3" / "models"
     
     # Model URLs from FlashbackLabs Hugging Face repository
     repo_id = "FlashbackLabs/FlashbackAvatars"
@@ -73,10 +73,6 @@ def download_echomimic_models():
                 },
                 "Wan2.1_VAE.pth": {
                     "url": f"{base_url}/models/Wan2.1-Fun-V1.1-1.3B-InP/Wan2.1_VAE.pth",
-                    "md5": None
-                },
-                "diffusion_pytorch_model.safetensors": {
-                    "url": f"{base_url}/models/Wan2.1-Fun-V1.1-1.3B-InP/diffusion_pytorch_model.safetensors",
                     "md5": None
                 },
                 "models_t5_umt5-xxl-enc-bf16.pth": {
@@ -102,6 +98,14 @@ def download_echomimic_models():
                 },
                 "google/umt5-xxl/tokenizer_config.json": {
                     "url": f"{base_url}/models/Wan2.1-Fun-V1.1-1.3B-InP/google/umt5-xxl/tokenizer_config.json",
+                    "md5": None
+                }
+            }
+        },
+        "transformers": {
+            "files": {
+                "diffusion_pytorch_model.safetensors": {
+                    "url": f"{base_url}/models/transformer/diffusion_pytorch_model.safetensors",
                     "md5": None
                 }
             }
@@ -144,7 +148,38 @@ def download_echomimic_models():
         except Exception as e:
             print(f"❌ Failed to download {filename}: {e}")
             return False
-    
+
+    # Download transformers model files
+    transformers_model_dir = models_dir / "transformers"
+    transformers_model_dir.mkdir(parents=True, exist_ok=True)
+
+    for filename, info in models["transformers"]["files"].items():
+        filepath = transformers_model_dir / filename
+
+        # Skip if file exists and checksum matches (if checksum available)
+        if filepath.exists():
+            if info["md5"] and verify_checksum(filepath, info["md5"]):
+                print(f"✅ {filename} already exists and verified")
+                continue
+            elif not info["md5"]:
+                print(f"✅ {filename} already exists (checksum verification skipped)")
+                continue
+
+        try:
+            download_file(info["url"], filepath)
+
+            # Verify checksum (if available)
+            if info["md5"] and not verify_checksum(filepath, info["md5"]):
+                print(f"❌ Checksum mismatch for {filename}")
+                os.remove(filepath)
+                return False
+            elif not info["md5"]:
+                print(f"   ⚠️  Checksum verification skipped (not available yet)")
+
+        except Exception as e:
+            print(f"❌ Failed to download {filename}: {e}")
+            return False
+
     # Download Wav2Vec2 model using transformers
     wav2vec_dir = models_dir / "wav2vec2-base-960h"
     
@@ -179,21 +214,26 @@ def main():
     """Main function"""
     print("🚀 EchoMimic v3 Model Downloader")
     print("=" * 40)
-    
+
     # Check if models already exist
-    models_dir = Path(__file__).parent / "services" / "renderer" / "models" / "pretrained"
+    models_dir = Path(__file__).parent / "third_party" / "echomimic_v3" / "models"
     main_model_dir = models_dir / "Wan2.1-Fun-V1.1-1.3B-InP"
     
     # Check if key model files exist
     key_files = [
         "config.json",
-        "Wan2.1_VAE.pth", 
-        "diffusion_pytorch_model.safetensors",
+        "Wan2.1_VAE.pth",
         "models_t5_umt5-xxl-enc-bf16.pth",
         "models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth"
     ]
+
+    # Check transformer file in separate directory
+    transformer_dir = models_dir / "transformers"
+    transformer_file = transformer_dir / "diffusion_pytorch_model.safetensors"
     
-    all_exist = main_model_dir.exists() and all((main_model_dir / f).exists() for f in key_files)
+    all_exist = (main_model_dir.exists() and
+                  all((main_model_dir / f).exists() for f in key_files) and
+                  transformer_file.exists())
     
     if all_exist:
         print("✅ Main model files already exist.")
@@ -206,8 +246,8 @@ def main():
     
     if success:
         print("\n✅ Setup complete! You can now run:")
-        print("cd services/renderer")
-        print("uvicorn server:app --host 0.0.0.0 --port 9000")
+        print("python setup_realtime_avatar.py")
+        print("python realtime_avatar_server.py")
     else:
         print("\n❌ Download failed. Please check your internet connection and try again.")
 
