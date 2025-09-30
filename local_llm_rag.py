@@ -140,7 +140,12 @@ class LocalLLMProcessor:
         try:
             # Test if model is available
             models = ollama.list()
-            model_names = [model['name'] for model in models['models']]
+
+            # Handle different response formats
+            if isinstance(models, dict) and 'models' in models:
+                model_names = [model.get('name', model.get('model', '')) for model in models['models']]
+            else:
+                model_names = []
 
             if self.model_name not in model_names:
                 print(f"📥 Downloading {self.model_name} model...")
@@ -150,6 +155,7 @@ class LocalLLMProcessor:
 
         except Exception as e:
             print(f"❌ Ollama initialization failed: {e}")
+            print(f"   Continuing with fallback LLM...")
 
     def initialize_transformers(self):
         """Initialize Transformers backend"""
