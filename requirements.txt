@@ -15,6 +15,15 @@ tomesd
 torchdiffeq
 torchsde
 tf-keras
+fastapi
+uvicorn
+websockets
+librosa
+soundfile
+webrtcvad
+SpeechRecognition
+pyttsx3
+
 
 # Image/Video processing
 decord
@@ -37,6 +46,8 @@ beautifulsoup4
 ftfy
 func_timeout
 onnxruntime
+requests
+tqdm
 
 # Web server and API
 fastapi

@@ -240,11 +240,28 @@ class FrameBankPlayer:
         return frames[frame_index] if frame_index < len(frames) else frames[-1]
 
 if __name__ == "__main__":
+    import asyncio
+
+    print("🎬 Starting Frame Bank Generation...")
+    print("=" * 60)
+
+    # Check if input video exists
+    import os
+    if not os.path.exists("avatar_input/vinay_intro.mp4"):
+        print("❌ Error: avatar_input/vinay_intro.mp4 not found!")
+        print("Please upload your video file first.")
+        exit(1)
+
     generator = FrameBankGenerator("avatar_input/vinay_intro.mp4")
 
-    # This would run the generation process
-    # import asyncio
-    # asyncio.run(generator.generate_frame_bank())
+    print("\n⚠️  WARNING: This will take 30-40 minutes to complete!")
+    print("The system will generate ~25 expression sets for real-time playback.")
+    print("\nGenerating frame banks using EchoMimic v3...")
+    print("Each expression takes ~1-2 minutes to generate.\n")
 
-    print("Frame Bank Generator ready!")
-    print("Run with: python frame_bank_generator.py")
+    # Run the generation process
+    asyncio.run(generator.generate_frame_bank())
+
+    print("\n✅ Frame bank generation complete!")
+    print("You can now start the avatar server with:")
+    print("python realtime_avatar_server.py")
