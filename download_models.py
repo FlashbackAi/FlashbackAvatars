@@ -189,13 +189,41 @@ def download_splatting_avatar_dependencies():
     print("✅ SplattingAvatar dependencies ready")
     return True
 
-def download_whisper_model():
-    """Download Whisper model for MuseTalk audio processing"""
+def download_avatar_input_videos():
+    """Download avatar input videos from HuggingFace"""
     base_dir = Path(__file__).parent
+    avatar_input_dir = base_dir / "avatar_input"
+    avatar_input_dir.mkdir(parents=True, exist_ok=True)
 
-    print("🎤 Whisper is included with MuseTalk models")
-    print("   No separate download needed")
+    print("🎬 Downloading avatar input videos...")
 
+    repo_id = "FlashbackLabs/FlashbackAvatars"
+    base_url = f"https://huggingface.co/{repo_id}/resolve/main"
+
+    # Video files to download (adjust based on what's uploaded)
+    video_files = [
+        "vinay_intro.mp4",
+        "vinay_intro_shoulders_up.mp4",
+        "vinay_audio.wav",
+        "vinayone.jpg"
+    ]
+
+    for filename in video_files:
+        filepath = avatar_input_dir / filename
+
+        if filepath.exists():
+            print(f"  ✅ {filename} already exists")
+            continue
+
+        url = f"{base_url}/avatar_input/{filename}"
+
+        try:
+            download_file(url, filepath)
+        except Exception as e:
+            print(f"  ⚠️  Could not download {filename}: {e}")
+            # Don't fail completely, continue with other files
+
+    print("✅ Avatar input videos downloaded")
     return True
 
 def main():
@@ -226,18 +254,19 @@ def main():
         print("⚠️  You can download MuseTalk models manually:")
         print("   cd third_party/MuseTalk && python scripts/download_models.py")
 
-    # 3. Whisper (already included in MuseTalk)
-    print("\n🔊 Step 3: Audio Processing (Whisper in MuseTalk)")
+    # 3. Avatar input videos
+    print("\n🎬 Step 3: Avatar Input Videos")
     print("-" * 50)
-    download_whisper_model()
+    download_avatar_input_videos()
 
     print("\n" + "=" * 50)
 
     if success:
-        print("✅ All models downloaded successfully!")
-        print("\n📋 Models downloaded:")
+        print("✅ All models and videos downloaded successfully!")
+        print("\n📋 Downloaded:")
         print("   • FLAME models (for SplattingAvatar head avatar)")
         print("   • MuseTalk models (for real-time lip-sync with Whisper)")
+        print("   • Avatar input videos (sample videos for training)")
         print("\n📋 Next steps:")
         print("1. Preprocess video: python preprocess_avatar_video.py avatar_input/vinay_intro_shoulders_up.mp4")
         print("2. Train avatar: python train_avatar.py third_party/SplattingAvatar/data/vinay_intro_shoulders_up --export")
