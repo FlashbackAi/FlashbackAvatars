@@ -113,11 +113,14 @@ rendering:
         os.chdir(self.splatting_dir)
 
         # Build training command
+        # Use relative path from splatting_dir
+        relative_data_dir = os.path.relpath(self.data_dir.absolute(), self.splatting_dir)
+
         cmd = [
             sys.executable,
             "train_splatting_avatar.py",
             "--config", str(self.config_path),
-            "--dat_dir", str(self.data_dir.absolute())
+            "--dat_dir", relative_data_dir
         ]
 
         if resume:

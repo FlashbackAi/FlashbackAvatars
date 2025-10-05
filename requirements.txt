@@ -4,6 +4,10 @@ torch
 torchvision
 torchaudio
 
+
+requests
+tqdm
+
 # Core ML/AI dependencies
 transformers
 diffusers
