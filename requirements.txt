@@ -4,10 +4,6 @@ torch
 torchvision
 torchaudio
 
-
-requests
-tqdm
-
 # Core ML/AI dependencies
 transformers
 diffusers
@@ -17,12 +13,17 @@ safetensors
 timm
 tomesd
 torchdiffeq
+mmcv
+mmdet
 torchsde
 tf-keras
 fastapi
 uvicorn
 websockets
 librosa
+mmpose
+requests
+tqdm
 soundfile
 webrtcvad
 SpeechRecognition

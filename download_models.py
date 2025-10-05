@@ -146,7 +146,7 @@ def download_musetalk_models():
         "whisper": ["config.json", "pytorch_model.bin", "preprocessor_config.json"],
         "dwpose": ["dw-ll_ucoco_384.pth"],
         "face-parse-bisent": ["79999_iter.pth", "resnet18-5c106cde.pth"],
-        "sd-vae": ["config.json", "diffusion_pytorch_model.bin"],
+        "sd-vae": ["config.json", "diffusion_pytorch_model.bin", "diffusion_pytorch_model.safetensors"],
         "syncnet": ["latentsync_unet.pt"]
     }
 
