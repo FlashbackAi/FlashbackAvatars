@@ -15,14 +15,14 @@ import json
 class SplattingAvatarTrainer:
     """Wrapper for SplattingAvatar training"""
 
-    def __init__(self, data_dir, output_dir=None, config="head_avatar"):
+    def __init__(self, data_dir, output_dir=None, config="splatting_avatar"):
         """
         Initialize trainer
 
         Args:
             data_dir: Preprocessed data directory
             output_dir: Output directory for trained model
-            config: Config name (head_avatar or full_body)
+            config: Config name (splatting_avatar, instant_avatar, etc.)
         """
         self.base_dir = Path(__file__).parent
         self.splatting_dir = self.base_dir / "third_party" / "SplattingAvatar"
@@ -50,50 +50,6 @@ class SplattingAvatarTrainer:
                 "Run: python preprocess_avatar_video.py <video_path>"
             )
 
-    def create_config(self):
-        """Create or update config file for head avatar"""
-
-        config_content = f"""
-# SplattingAvatar Head Avatar Configuration
-# For shoulders-up avatar like Anam.ai
-
-model:
-  type: SplattingAvatar
-  mode: head  # head or full_body
-  max_n_gauss: 200000  # Reduced for head-only (vs 300k for full body)
-  use_flame: true
-  flame_model: data/FLAME2020/generic_model.pkl
-
-training:
-  batch_size: 1
-  num_iterations: 30000
-  learning_rate: 0.0001
-  lr_decay: 0.98
-  checkpoint_interval: 5000
-
-data:
-  data_dir: {self.data_dir.absolute()}
-  output_dir: {self.output_dir.absolute()}
-  image_scale: 1.0
-  use_mask: true
-
-optimization:
-  walking_on_triangle: true  # SplattingAvatar's unique feature
-  point_cloud_optimization: true
-  blend_shape_optimization: true
-
-rendering:
-  image_size: [512, 512]
-  near: 0.1
-  far: 100.0
-"""
-
-        # Save config
-        self.config_path.parent.mkdir(exist_ok=True)
-        with open(self.config_path, 'w') as f:
-            f.write(config_content)
-
-        print(f"✅ Created config: {self.config_path}")
 
     def train(self, resume=False):
         """Run training"""
@@ -105,9 +61,12 @@ rendering:
         print(f"⚙️  Config: {self.config_name}")
         print("=" * 50)
 
-        # Create config if it doesn't exist
+        # Check if config exists
         if not self.config_path.exists():
-            self.create_config()
+            raise FileNotFoundError(
+                f"Config not found: {self.config_path}\n"
+                f"Available configs: splatting_avatar, instant_avatar, standard_3dgs"
+            )
 
         # Change to SplattingAvatar directory
         os.chdir(self.splatting_dir)
@@ -119,12 +78,14 @@ rendering:
         cmd = [
             sys.executable,
             "train_splatting_avatar.py",
-            "--config", str(self.config_path),
-            "--dat_dir", relative_data_dir
+            "--configs", str(self.config_path),  # Note: --configs not --config
+            "--dat_dir", relative_data_dir,
+            "--model_path", str(self.output_dir)
         ]
 
         if resume:
-            cmd.append("--resume")
+            # For resume, we need to point to existing model directory
+            pass  # model_path already set above
 
         print(f"🚀 Running: {' '.join(cmd)}")
         print()
@@ -289,7 +250,7 @@ def main():
     parser = argparse.ArgumentParser(description="Train SplattingAvatar")
     parser.add_argument("data_dir", help="Preprocessed data directory")
     parser.add_argument("--output", "-o", default=None, help="Output directory")
-    parser.add_argument("--config", "-c", default="head_avatar", help="Config name")
+    parser.add_argument("--config", "-c", default="splatting_avatar", help="Config name (splatting_avatar, instant_avatar, standard_3dgs)")
     parser.add_argument("--resume", action="store_true", help="Resume training")
     parser.add_argument("--export", action="store_true", help="Export to web format after training")
 
