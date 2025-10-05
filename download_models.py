@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Model Download Script for EchoMimic v3
-Downloads pre-trained models from Hugging Face Hub or other sources
+Model Download Script for Real-Time Avatar Pipeline
+Downloads SplattingAvatar, MuseTalk, and required models
 """
 
 import os
@@ -10,20 +10,21 @@ import zipfile
 from pathlib import Path
 from tqdm import tqdm
 import hashlib
+import shutil
 
 def download_file(url, filepath, expected_size=None):
     """Download a file with progress bar"""
     print(f"📥 Downloading {os.path.basename(filepath)}...")
-    
+
     response = requests.get(url, stream=True)
     response.raise_for_status()
-    
+
     total_size = int(response.headers.get('content-length', 0))
     if expected_size and total_size != expected_size:
         print(f"⚠️  Warning: Expected {expected_size} bytes, got {total_size} bytes")
-    
+
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    
+
     with open(filepath, 'wb') as f, tqdm(
         desc=os.path.basename(filepath),
         total=total_size,
@@ -35,221 +36,215 @@ def download_file(url, filepath, expected_size=None):
             if chunk:
                 f.write(chunk)
                 pbar.update(len(chunk))
-    
+
     print(f"✅ Downloaded: {filepath}")
 
 def verify_checksum(filepath, expected_md5):
     """Verify file integrity"""
     if not os.path.exists(filepath):
         return False
-    
+
     hash_md5 = hashlib.md5()
     with open(filepath, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
-    
+
     return hash_md5.hexdigest() == expected_md5
 
-def download_echomimic_models():
-    """Download EchoMimic v3 models"""
-
+def upload_flame_models():
+    """Upload FLAME models to Hugging Face"""
     base_dir = Path(__file__).parent
-    models_dir = base_dir / "third_party" / "echomimic_v3" / "models"
-    
-    # Model URLs from FlashbackLabs Hugging Face repository
+    flame_dir = base_dir / "third_party" / "SplattingAvatar" / "data" / "FLAME2020"
+
+    if not flame_dir.exists():
+        print("❌ FLAME directory not found. Please download FLAME models first.")
+        return False
+
+    print("📤 Uploading FLAME models to Hugging Face...")
+
+    repo_id = "FlashbackLabs/FlashbackAvatars"
+
+    try:
+        from huggingface_hub import HfApi, upload_file
+        api = HfApi()
+
+        # Get token from environment or prompt
+        token = os.getenv("HF_TOKEN")
+        if not token:
+            print("⚠️  HF_TOKEN not found in environment.")
+            print("Please set it: export HF_TOKEN=your_token")
+            return False
+
+        # Upload FLAME models
+        flame_files = ["generic_model.pkl", "male_model.pkl", "female_model.pkl"]
+
+        for filename in flame_files:
+            filepath = flame_dir / filename
+            if filepath.exists():
+                print(f"📤 Uploading {filename}...")
+                upload_file(
+                    path_or_fileobj=str(filepath),
+                    path_in_repo=f"models/FLAME2020/{filename}",
+                    repo_id=repo_id,
+                    token=token
+                )
+                print(f"✅ Uploaded {filename}")
+
+        print("✅ FLAME models uploaded successfully!")
+        return True
+
+    except Exception as e:
+        print(f"❌ Failed to upload FLAME models: {e}")
+        return False
+
+def download_flame_models():
+    """Download FLAME models from Hugging Face"""
+    base_dir = Path(__file__).parent
+    flame_dir = base_dir / "third_party" / "SplattingAvatar" / "data" / "FLAME2020"
+    flame_dir.mkdir(parents=True, exist_ok=True)
+
     repo_id = "FlashbackLabs/FlashbackAvatars"
     base_url = f"https://huggingface.co/{repo_id}/resolve/main"
-    
-    models = {
-        "Wan2.1-Fun-V1.1-1.3B-InP": {
-            "files": {
-                "LICENSE.txt": {
-                    "url": f"{base_url}/models/Wan2.1-Fun-V1.1-1.3B-InP/LICENSE.txt",
-                    "md5": None  # Will be updated after upload
-                },
-                "config.json": {
-                    "url": f"{base_url}/models/Wan2.1-Fun-V1.1-1.3B-InP/config.json",
-                    "md5": None
-                },
-                "Wan2.1_VAE.pth": {
-                    "url": f"{base_url}/models/Wan2.1-Fun-V1.1-1.3B-InP/Wan2.1_VAE.pth",
-                    "md5": None
-                },
-                "models_t5_umt5-xxl-enc-bf16.pth": {
-                    "url": f"{base_url}/models/Wan2.1-Fun-V1.1-1.3B-InP/models_t5_umt5-xxl-enc-bf16.pth",
-                    "md5": None
-                },
-                "models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth": {
-                    "url": f"{base_url}/models/Wan2.1-Fun-V1.1-1.3B-InP/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth",
-                    "md5": None
-                },
-                # Tokenizer files
-                "google/umt5-xxl/special_tokens_map.json": {
-                    "url": f"{base_url}/models/Wan2.1-Fun-V1.1-1.3B-InP/google/umt5-xxl/special_tokens_map.json",
-                    "md5": None
-                },
-                "google/umt5-xxl/spiece.model": {
-                    "url": f"{base_url}/models/Wan2.1-Fun-V1.1-1.3B-InP/google/umt5-xxl/spiece.model",
-                    "md5": None
-                },
-                "google/umt5-xxl/tokenizer.json": {
-                    "url": f"{base_url}/models/Wan2.1-Fun-V1.1-1.3B-InP/google/umt5-xxl/tokenizer.json",
-                    "md5": None
-                },
-                "google/umt5-xxl/tokenizer_config.json": {
-                    "url": f"{base_url}/models/Wan2.1-Fun-V1.1-1.3B-InP/google/umt5-xxl/tokenizer_config.json",
-                    "md5": None
-                }
-            }
-        },
-        "transformers": {
-            "files": {
-                "diffusion_pytorch_model.safetensors": {
-                    "url": f"{base_url}/models/transformer/diffusion_pytorch_model.safetensors",
-                    "md5": None
-                }
-            }
-        },
-        "wav2vec2-base-960h": {
-            "huggingface_repo": "facebook/wav2vec2-base-960h"
-        }
+
+    flame_files = ["generic_model.pkl", "male_model.pkl", "female_model.pkl"]
+
+    print("🔥 Downloading FLAME models...")
+
+    for filename in flame_files:
+        filepath = flame_dir / filename
+
+        if filepath.exists():
+            print(f"✅ {filename} already exists")
+            continue
+
+        url = f"{base_url}/models/FLAME2020/{filename}"
+
+        try:
+            download_file(url, filepath)
+        except Exception as e:
+            print(f"❌ Failed to download {filename}: {e}")
+            print(f"   You can manually download from: https://flame.is.tue.mpg.de/")
+            return False
+
+    return True
+
+def download_musetalk_models():
+    """Download MuseTalk models from HuggingFace"""
+    base_dir = Path(__file__).parent
+    musetalk_dir = base_dir / "third_party" / "MuseTalk" / "models"
+    musetalk_dir.mkdir(parents=True, exist_ok=True)
+
+    print("🎤 Downloading MuseTalk models...")
+
+    # Model structure from FlashbackLabs repo
+    repo_id = "FlashbackLabs/FlashbackAvatars"
+    base_url = f"https://huggingface.co/{repo_id}/resolve/main"
+
+    model_structure = {
+        "musetalk": ["musetalk.json", "pytorch_model.bin"],
+        "musetalkV15": ["musetalk.json", "unet.pth"],
+        "whisper": ["config.json", "pytorch_model.bin", "preprocessor_config.json"],
+        "dwpose": ["dw-ll_ucoco_384.pth"],
+        "face-parse-bisent": ["79999_iter.pth", "resnet18-5c106cde.pth"],
+        "sd-vae": ["config.json", "diffusion_pytorch_model.bin"],
+        "syncnet": ["latentsync_unet.pt"]
     }
-    
-    print("🎭 Downloading EchoMimic v3 Models")
-    print("=" * 50)
-    
-    # Download main model files
-    main_model_dir = models_dir / "Wan2.1-Fun-V1.1-1.3B-InP"
-    main_model_dir.mkdir(parents=True, exist_ok=True)
-    
-    for filename, info in models["Wan2.1-Fun-V1.1-1.3B-InP"]["files"].items():
-        filepath = main_model_dir / filename
-        
-        # Skip if file exists and checksum matches (if checksum available)
-        if filepath.exists():
-            if info["md5"] and verify_checksum(filepath, info["md5"]):
-                print(f"✅ {filename} already exists and verified")
+
+    for subdir, files in model_structure.items():
+        print(f"  📂 Downloading {subdir}...")
+        subdir_path = musetalk_dir / subdir
+        subdir_path.mkdir(parents=True, exist_ok=True)
+
+        for filename in files:
+            filepath = subdir_path / filename
+
+            if filepath.exists():
+                print(f"     ✅ {filename} already exists")
                 continue
-            elif not info["md5"]:
-                print(f"✅ {filename} already exists (checksum verification skipped)")
-                continue
-        
-        try:
-            download_file(info["url"], filepath)
-            
-            # Verify checksum (if available)
-            if info["md5"] and not verify_checksum(filepath, info["md5"]):
-                print(f"❌ Checksum mismatch for {filename}")
-                os.remove(filepath)
+
+            url = f"{base_url}/models/MuseTalk/{subdir}/{filename}"
+
+            try:
+                download_file(url, filepath)
+            except Exception as e:
+                print(f"     ❌ Failed to download {filename}: {e}")
                 return False
-            elif not info["md5"]:
-                print(f"   ⚠️  Checksum verification skipped (not available yet)")
-                
-        except Exception as e:
-            print(f"❌ Failed to download {filename}: {e}")
-            return False
 
-    # Download transformers model files
-    transformers_model_dir = models_dir / "transformers"
-    transformers_model_dir.mkdir(parents=True, exist_ok=True)
+    print("✅ MuseTalk models downloaded")
+    return True
 
-    for filename, info in models["transformers"]["files"].items():
-        filepath = transformers_model_dir / filename
+def download_splatting_avatar_dependencies():
+    """Download dependencies for SplattingAvatar"""
+    base_dir = Path(__file__).parent
 
-        # Skip if file exists and checksum matches (if checksum available)
-        if filepath.exists():
-            if info["md5"] and verify_checksum(filepath, info["md5"]):
-                print(f"✅ {filename} already exists and verified")
-                continue
-            elif not info["md5"]:
-                print(f"✅ {filename} already exists (checksum verification skipped)")
-                continue
+    print("📦 Setting up SplattingAvatar dependencies...")
 
-        try:
-            download_file(info["url"], filepath)
+    # FLAME models
+    if not download_flame_models():
+        return False
 
-            # Verify checksum (if available)
-            if info["md5"] and not verify_checksum(filepath, info["md5"]):
-                print(f"❌ Checksum mismatch for {filename}")
-                os.remove(filepath)
-                return False
-            elif not info["md5"]:
-                print(f"   ⚠️  Checksum verification skipped (not available yet)")
+    # Download SMPL models (if needed for full body)
+    # For head-only avatar, FLAME is sufficient
 
-        except Exception as e:
-            print(f"❌ Failed to download {filename}: {e}")
-            return False
+    print("✅ SplattingAvatar dependencies ready")
+    return True
 
-    # Download Wav2Vec2 model using transformers
-    wav2vec_dir = models_dir / "wav2vec2-base-960h"
-    
-    # Check if wav2vec2 model already exists
-    if wav2vec_dir.exists() and (wav2vec_dir / "config.json").exists() and (wav2vec_dir / "model.safetensors").exists():
-        print("✅ Wav2Vec2 model already exists, skipping download...")
-    else:
-        print("🔄 Downloading Wav2Vec2 model...")
-        try:
-            from transformers import Wav2Vec2Model, Wav2Vec2Processor
-            
-            # This will download and cache the model
-            processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-            model = Wav2Vec2Model.from_pretrained("facebook/wav2vec2-base-960h")
-            
-            # Save to local directory
-            processor.save_pretrained(wav2vec_dir)
-            model.save_pretrained(wav2vec_dir)
-            
-            print("✅ Wav2Vec2 model downloaded")
-            
-        except Exception as e:
-            print(f"❌ Failed to download Wav2Vec2: {e}")
-            return False
-    
-    print("\n🎉 All models downloaded successfully!")
-    print(f"📁 Models saved to: {models_dir}")
-    
+def download_whisper_model():
+    """Download Whisper model for MuseTalk audio processing"""
+    base_dir = Path(__file__).parent
+
+    print("🎤 Whisper is included with MuseTalk models")
+    print("   No separate download needed")
+
     return True
 
 def main():
     """Main function"""
-    print("🚀 EchoMimic v3 Model Downloader")
-    print("=" * 40)
+    print("🚀 Real-Time Avatar Model Downloader")
+    print("=" * 50)
 
-    # Check if models already exist
-    models_dir = Path(__file__).parent / "third_party" / "echomimic_v3" / "models"
-    main_model_dir = models_dir / "Wan2.1-Fun-V1.1-1.3B-InP"
-    
-    # Check if key model files exist
-    key_files = [
-        "config.json",
-        "Wan2.1_VAE.pth",
-        "models_t5_umt5-xxl-enc-bf16.pth",
-        "models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth"
-    ]
+    base_dir = Path(__file__).parent
 
-    # Check transformer file in separate directory
-    transformer_dir = models_dir / "transformers"
-    transformer_file = transformer_dir / "diffusion_pytorch_model.safetensors"
-    
-    all_exist = (main_model_dir.exists() and
-                  all((main_model_dir / f).exists() for f in key_files) and
-                  transformer_file.exists())
-    
-    if all_exist:
-        print("✅ Main model files already exist.")
-        response = input("Re-download all models? (y/N): ")
-        if response.lower() != 'y':
-            print("Skipping download. Use existing models.")
-            return
-    
-    success = download_echomimic_models()
-    
+    # Check if we want to upload FLAME models first
+    if "--upload-flame" in os.sys.argv:
+        upload_flame_models()
+        return
+
+    # Download all required models
+    success = True
+
+    # 1. SplattingAvatar dependencies (FLAME models)
+    print("\n📦 Step 1: SplattingAvatar Dependencies")
+    print("-" * 50)
+    if not download_splatting_avatar_dependencies():
+        success = False
+
+    # 2. MuseTalk models
+    print("\n🎤 Step 2: MuseTalk Models")
+    print("-" * 50)
+    if not download_musetalk_models():
+        print("⚠️  You can download MuseTalk models manually:")
+        print("   cd third_party/MuseTalk && python scripts/download_models.py")
+
+    # 3. Whisper (already included in MuseTalk)
+    print("\n🔊 Step 3: Audio Processing (Whisper in MuseTalk)")
+    print("-" * 50)
+    download_whisper_model()
+
+    print("\n" + "=" * 50)
+
     if success:
-        print("\n✅ Setup complete! You can now run:")
-        print("python setup_realtime_avatar.py")
-        print("python realtime_avatar_server.py")
+        print("✅ All models downloaded successfully!")
+        print("\n📋 Models downloaded:")
+        print("   • FLAME models (for SplattingAvatar head avatar)")
+        print("   • MuseTalk models (for real-time lip-sync with Whisper)")
+        print("\n📋 Next steps:")
+        print("1. Preprocess video: python preprocess_avatar_video.py avatar_input/vinay_intro_shoulders_up.mp4")
+        print("2. Train avatar: python train_avatar.py third_party/SplattingAvatar/data/vinay_intro_shoulders_up --export")
+        print("3. Start server: python realtime_avatar_server.py")
     else:
-        print("\n❌ Download failed. Please check your internet connection and try again.")
+        print("⚠️  Some models failed to download. Check errors above.")
+        print("You can manually download missing models and re-run this script.")
 
 if __name__ == "__main__":
     main()

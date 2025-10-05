@@ -49,6 +49,14 @@ except ImportError:
 from frame_bank_generator import FrameBankPlayer
 from local_llm_rag import EnhancedLLMProcessor
 
+# Real-time avatar rendering
+try:
+    from services.musetalk_animator import MuseTalkAnimator
+    MUSETALK_AVAILABLE = True
+except ImportError:
+    MUSETALK_AVAILABLE = False
+    print("⚠️  MuseTalk not available. Run: bash setup_musetalk.sh")
+
 class AvatarState(Enum):
     IDLE = "idle"
     LISTENING = "listening"
@@ -174,6 +182,20 @@ class RealTimeAvatarServer:
             self.llm = LLMProcessor()
 
         self.tts = TTSProcessor()
+
+        # Initialize MuseTalk animator for real-time lip-sync
+        if MUSETALK_AVAILABLE:
+            try:
+                self.musetalk = MuseTalkAnimator()
+                print("✅ MuseTalk animator initialized")
+            except Exception as e:
+                print(f"⚠️  MuseTalk init failed: {e}")
+                self.musetalk = None
+        else:
+            self.musetalk = None
+
+        # Avatar model path
+        self.avatar_model_path = "third_party/SplattingAvatar/output/vinay_intro_shoulders_up/vinay_avatar.ply"
 
         # Avatar state management
         self.current_state = AvatarState.IDLE
@@ -363,20 +385,50 @@ class RealTimeAvatarServer:
         # Change to speaking state
         await self.change_avatar_state(AvatarState.SPEAKING)
 
-        # Convert response to phonemes for lip-sync
-        phonemes = self.tts.text_to_phonemes(response)
+        # Generate TTS audio
+        tts_audio_path = "temp_tts.wav"  # Temporary audio file
+        # In production, use actual TTS to generate audio file
 
-        # Send response to client
-        await websocket.send_json({
-            "type": "response",
-            "text": response,
-            "phonemes": phonemes,
-            "duration": duration,
-            "emotion": emotion
-        })
+        # If MuseTalk is available, generate real-time animation
+        if self.musetalk:
+            asyncio.create_task(self.stream_musetalk_animation(websocket, tts_audio_path, response, duration))
+        else:
+            # Fallback to phoneme-based animation
+            phonemes = self.tts.text_to_phonemes(response)
+
+            # Send response to client
+            await websocket.send_json({
+                "type": "response",
+                "text": response,
+                "phonemes": phonemes,
+                "duration": duration,
+                "emotion": emotion
+            })
 
         # Schedule return to idle state
         asyncio.create_task(self.schedule_idle_return(duration))
+
+    async def stream_musetalk_animation(self, websocket: WebSocket, audio_path: str, text: str, duration: float):
+        """Stream MuseTalk animation frames in real-time"""
+        try:
+            # Send text response first
+            await websocket.send_json({
+                "type": "response",
+                "text": text,
+                "duration": duration
+            })
+
+            # Stream animation parameters from MuseTalk
+            async for animation_params in self.musetalk.animate_from_audio(audio_path, fps=30):
+                # Send animation parameters to client for rendering
+                await websocket.send_json({
+                    "type": "animation",
+                    "params": animation_params,
+                    "timestamp": animation_params.get('timestamp', 0)
+                })
+
+        except Exception as e:
+            print(f"MuseTalk streaming error: {e}")
 
     async def schedule_idle_return(self, delay: float):
         """Return to idle state after speaking"""
@@ -449,7 +501,10 @@ class RealTimeAvatarServer:
 
                 <div class="avatar-section">
                     <div class="video-container">
-                        <canvas id="avatarCanvas" class="avatar-video" width="512" height="512"></canvas>
+                        <canvas id="avatarCanvas" class="avatar-video" width="800" height="600"></canvas>
+                        <div id="loadingOverlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); color: white;">
+                            <div>Loading avatar model...</div>
+                        </div>
                     </div>
 
                     <div class="controls">
@@ -478,18 +533,98 @@ class RealTimeAvatarServer:
                 </div>
             </div>
 
-            <script>
+            <script type="module">
+                // Import Three.js for Gaussian Splatting rendering
+                import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
                 // WebSocket connection
                 const ws = new WebSocket(`ws://${window.location.host}/avatar`);
                 const canvas = document.getElementById('avatarCanvas');
-                const ctx = canvas.getContext('2d');
                 const statusBar = document.getElementById('statusBar');
                 const currentState = document.getElementById('currentState');
                 const chatHistory = document.getElementById('chatHistory');
+                const loadingOverlay = document.getElementById('loadingOverlay');
 
                 let isRecording = false;
                 let mediaRecorder;
                 let audioChunks = [];
+
+                // Three.js scene for avatar rendering
+                let scene, camera, renderer;
+                let avatarModel = null;
+                let animationParams = { jawOpen: 0, mouthWidth: 0, lipUpper: 0, lipLower: 0 };
+
+                // Initialize Three.js scene
+                function initAvatarRenderer() {
+                    scene = new THREE.Scene();
+                    scene.background = new THREE.Color(0x1a1a1a);
+
+                    camera = new THREE.PerspectiveCamera(50, canvas.width / canvas.height, 0.1, 100);
+                    camera.position.set(0, 0, 3);
+
+                    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+                    renderer.setSize(canvas.width, canvas.height);
+                    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+                    // Add lighting
+                    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+                    scene.add(ambientLight);
+
+                    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+                    directionalLight.position.set(5, 5, 5);
+                    scene.add(directionalLight);
+
+                    // Load avatar model
+                    loadAvatarModel();
+
+                    // Start render loop
+                    animate();
+                }
+
+                // Load Gaussian Splatting avatar model
+                async function loadAvatarModel() {
+                    try {
+                        // For now, use a simple placeholder geometry
+                        // In production, load actual Gaussian Splatting .ply file
+                        const geometry = new THREE.SphereGeometry(0.5, 32, 32);
+                        const material = new THREE.MeshStandardMaterial({
+                            color: 0xffdbac,  // Skin tone
+                            roughness: 0.7,
+                            metalness: 0.1
+                        });
+                        avatarModel = new THREE.Mesh(geometry, material);
+                        scene.add(avatarModel);
+
+                        loadingOverlay.style.display = 'none';
+                        console.log('✅ Avatar model loaded');
+
+                        // TODO: Load actual .ply Gaussian Splatting model from:
+                        // /models/vinay_avatar.ply
+                    } catch (error) {
+                        console.error('❌ Failed to load avatar:', error);
+                        loadingOverlay.innerHTML = '<div>Error loading avatar model</div>';
+                    }
+                }
+
+                // Animation loop
+                function animate() {
+                    requestAnimationFrame(animate);
+
+                    // Apply animation parameters to avatar
+                    if (avatarModel) {
+                        // Simple demonstration - scale based on jaw open
+                        const scale = 1 + (animationParams.jawOpen * 0.2);
+                        avatarModel.scale.set(scale, scale, scale);
+
+                        // Rotate slightly for visual interest
+                        avatarModel.rotation.y += 0.005;
+                    }
+
+                    renderer.render(scene, camera);
+                }
+
+                // Initialize on load
+                window.addEventListener('load', initAvatarRenderer);
 
                 // Handle WebSocket messages
                 ws.onmessage = function(event) {
@@ -497,8 +632,11 @@ class RealTimeAvatarServer:
 
                     switch(data.type) {
                         case 'frame':
-                            displayFrame(data.data);
-                            updateStatus(data.state);
+                            // Legacy frame-based rendering (deprecated)
+                            break;
+                        case 'animation':
+                            // Real-time MuseTalk animation parameters
+                            updateAvatarAnimation(data.params);
                             break;
                         case 'response':
                             addToChat('Avatar', data.text);
@@ -509,14 +647,16 @@ class RealTimeAvatarServer:
                     }
                 };
 
-                // Display avatar frame
-                function displayFrame(frameData) {
-                    const img = new Image();
-                    img.onload = function() {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                // Update avatar with animation parameters from MuseTalk
+                function updateAvatarAnimation(params) {
+                    animationParams = {
+                        jawOpen: params.jaw_open || 0,
+                        mouthWidth: params.mouth_width || 0,
+                        lipUpper: params.lip_upper || 0,
+                        lipLower: params.lip_lower || 0
                     };
-                    img.src = 'data:image/jpeg;base64,' + frameData;
+
+                    // Animation is applied in the render loop
                 }
 
                 // Update status bar

@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
-Upload EchoMimic v3 models to Hugging Face Hub
+Upload Models to Hugging Face Hub
 Repository: https://huggingface.co/FlashbackLabs/FlashbackAvatars
+
+Uploads:
+1. FLAME models (must download manually first from https://flame.is.tue.mpg.de/)
+2. MuseTalk models (all subdirectories)
 """
 
 import os
@@ -18,31 +22,155 @@ def calculate_md5(filepath):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
-def check_file_exists_on_hf(api, repo_id, path_in_repo):
-    """Check if a file already exists on Hugging Face"""
-    try:
-        info = api.get_paths_info(repo_id, paths=[path_in_repo])
-        print(f"   🔍 Checking {path_in_repo}: Found")
-        return True
-    except Exception as e:
-        print(f"   🔍 Checking {path_in_repo}: Not found ({str(e)[:50]}...)")
+def upload_flame_models(api, repo_id, token, base_dir):
+    """Upload FLAME models to Hugging Face"""
+
+    flame_dir = base_dir / "third_party" / "SplattingAvatar" / "data" / "FLAME2020"
+
+    if not flame_dir.exists():
+        print(f"❌ FLAME directory not found: {flame_dir}")
+        print("\n📋 Instructions:")
+        print("1. Go to: https://flame.is.tue.mpg.de/")
+        print("2. Register with academic email")
+        print("3. Download FLAME 2020 models")
+        print("4. Extract to: third_party/SplattingAvatar/data/FLAME2020/")
+        print("5. Run this script again")
         return False
 
-def upload_models():
-    """Upload all model files to Hugging Face"""
-    
+    print("\n🔥 Uploading FLAME Models")
+    print("=" * 60)
+
+    # FLAME files to upload
+    flame_files = [
+        "generic_model.pkl",
+        "male_model.pkl",
+        "female_model.pkl"
+    ]
+
+    for filename in flame_files:
+        filepath = flame_dir / filename
+        path_in_repo = f"models/FLAME2020/{filename}"
+
+        if not filepath.exists():
+            print(f"⚠️  File not found: {filename}")
+            continue
+
+        # Check if file already exists on HF
+        try:
+            files_in_repo = api.list_repo_files(repo_id, token=token)
+            if path_in_repo in files_in_repo:
+                print(f"✅ {filename} already exists, skipping...")
+                continue
+        except Exception as e:
+            # If we can't check, just try to upload
+            print(f"   ⚠️  Could not check if file exists: {e}")
+            pass
+
+        file_size = filepath.stat().st_size / (1024**2)  # MB
+        print(f"📤 Uploading {filename} ({file_size:.2f} MB)...")
+
+        try:
+            upload_file(
+                path_or_fileobj=str(filepath),
+                path_in_repo=path_in_repo,
+                repo_id=repo_id,
+                token=token,
+                commit_message=f"Upload FLAME model {filename}"
+            )
+            print(f"   ✅ Uploaded successfully")
+        except Exception as e:
+            print(f"   ❌ Upload failed: {e}")
+            return False
+
+    return True
+
+def upload_musetalk_models(api, repo_id, token, base_dir):
+    """Upload MuseTalk models to Hugging Face"""
+
+    musetalk_dir = base_dir / "third_party" / "MuseTalk" / "models"
+
+    if not musetalk_dir.exists():
+        print(f"❌ MuseTalk models not found: {musetalk_dir}")
+        print("Run download_weights.sh in third_party/MuseTalk first")
+        return False
+
+    print("\n🎤 Uploading MuseTalk Models")
+    print("=" * 60)
+
+    # Model subdirectories and their files
+    model_structure = {
+        "musetalk": ["musetalk.json", "pytorch_model.bin"],
+        "musetalkV15": ["musetalk.json", "unet.pth"],
+        "whisper": ["config.json", "pytorch_model.bin", "preprocessor_config.json"],
+        "dwpose": ["dw-ll_ucoco_384.pth"],
+        "face-parse-bisent": ["79999_iter.pth", "resnet18-5c106cde.pth"],
+        "sd-vae": ["config.json", "diffusion_pytorch_model.bin"],
+        "syncnet": ["latentsync_unet.pt"]
+    }
+
+    for subdir, files in model_structure.items():
+        print(f"\n📂 Uploading {subdir}...")
+
+        for filename in files:
+            filepath = musetalk_dir / subdir / filename
+            path_in_repo = f"models/MuseTalk/{subdir}/{filename}"
+
+            if not filepath.exists():
+                print(f"   ⚠️  File not found: {subdir}/{filename}")
+                continue
+
+            # Check if file already exists on HF
+            try:
+                files_in_repo = api.list_repo_files(repo_id, token=token)
+                if path_in_repo in files_in_repo:
+                    print(f"   ✅ {filename} already exists, skipping...")
+                    continue
+            except Exception as e:
+                # If we can't check, just try to upload
+                print(f"   ⚠️  Could not check if file exists: {e}")
+                pass
+
+            file_size = filepath.stat().st_size / (1024**2)  # MB
+            print(f"   📤 Uploading {filename} ({file_size:.2f} MB)...")
+
+            try:
+                upload_file(
+                    path_or_fileobj=str(filepath),
+                    path_in_repo=path_in_repo,
+                    repo_id=repo_id,
+                    token=token,
+                    commit_message=f"Upload MuseTalk {subdir}/{filename}"
+                )
+                print(f"   ✅ Uploaded")
+            except Exception as e:
+                print(f"   ❌ Failed: {e}")
+                # Don't fail completely, continue with other files
+
+    return True
+
+def main():
+    print("🤗 FlashbackAvatars Model Uploader")
+    print("=" * 60)
+    print("Repository: FlashbackLabs/FlashbackAvatars")
+    print()
+
     # Configuration
     repo_id = "FlashbackLabs/FlashbackAvatars"
-    token = input("Enter your Hugging Face token: ").strip()
-    
+
+    # Get token from environment or prompt
+    token = os.getenv("HF_TOKEN")
+    if not token:
+        token = input("Enter your Hugging Face token (or set HF_TOKEN env var): ").strip()
+
     if not token:
         print("❌ Hugging Face token required!")
         print("Get your token from: https://huggingface.co/settings/tokens")
-        return False
-    
+        print("Or set: export HF_TOKEN=your_token")
+        return
+
     # Initialize API
     api = HfApi(token=token)
-    
+
     # Ensure repo exists
     try:
         api.repo_info(repo_id)
@@ -50,216 +178,64 @@ def upload_models():
     except:
         print(f"Creating repository {repo_id}...")
         create_repo(repo_id, token=token, repo_type="model")
-    
+
     base_dir = Path(__file__).parent
-    models_dir = base_dir / "services" / "renderer" / "models" / "pretrained"
-    
-    print(f"🚀 Uploading models from {models_dir}")
-    print("=" * 60)
-    
-    # Upload main model files
-    main_model_dir = models_dir / "Wan2.1-Fun-V1.1-1.3B-InP"
-    
-    if not main_model_dir.exists():
-        print(f"❌ Model directory not found: {main_model_dir}")
-        return False
-    
-    # Files to upload with their paths (excluding transformer model)
-    files_to_upload = [
-        "LICENSE.txt",
-        "config.json",
-        "Wan2.1_VAE.pth",
-        "models_t5_umt5-xxl-enc-bf16.pth",
-        "models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth"
-    ]
-    
-    # Tokenizer files in google/umt5-xxl/ folder
-    tokenizer_files = [
-        "google/umt5-xxl/special_tokens_map.json",
-        "google/umt5-xxl/spiece.model",
-        "google/umt5-xxl/tokenizer.json",
-        "google/umt5-xxl/tokenizer_config.json"
-    ]
-    
-    # Calculate checksums and upload
-    checksums = {}
-    
-    # Upload main model files
-    for filename in files_to_upload:
-        filepath = main_model_dir / filename
-        path_in_repo = f"models/Wan2.1-Fun-V1.1-1.3B-InP/{filename}"
-        
-        if not filepath.exists():
-            print(f"⚠️  File not found: {filename}")
-            continue
-        
-        # Check if file already exists on HF
-        if check_file_exists_on_hf(api, repo_id, path_in_repo):
-            print(f"✅ {filename} already exists on Hugging Face, skipping...")
-            continue
-        
-        file_size = filepath.stat().st_size / (1024**3)  # GB
-        print(f"📤 Uploading {filename} ({file_size:.2f} GB)...")
-        
-        # Calculate MD5
-        print("   Calculating checksum...")
-        md5_hash = calculate_md5(filepath)
-        checksums[filename] = md5_hash
-        print(f"   MD5: {md5_hash}")
-        
-        try:
-            # Upload to HF
-            upload_file(
-                path_or_fileobj=str(filepath),
-                path_in_repo=path_in_repo,
-                repo_id=repo_id,
-                token=token,
-                commit_message=f"Upload {filename}"
-            )
-            print(f"   ✅ Uploaded successfully")
-            
-        except Exception as e:
-            print(f"   ❌ Upload failed: {e}")
-            return False
 
-    # Upload transformer model to separate directory
-    transformer_file = "diffusion_pytorch_model.safetensors"
-    transformer_filepath = main_model_dir / transformer_file
-    transformer_path_in_repo = f"models/transformer/{transformer_file}"
+    # Check what models are available
+    flame_dir = base_dir / "third_party" / "SplattingAvatar" / "data" / "FLAME2020"
+    musetalk_dir = base_dir / "third_party" / "MuseTalk" / "models"
 
-    if transformer_filepath.exists():
-        # Force upload to new location (even if it exists in old location)
-        print(f"🔄 Moving {transformer_file} to models/transformer/ directory...")
+    has_flame = flame_dir.exists() and (flame_dir / "generic_model.pkl").exists()
+    has_musetalk = musetalk_dir.exists() and (musetalk_dir / "musetalk" / "pytorch_model.bin").exists()
 
-        # Check if file already exists in NEW location
-        if check_file_exists_on_hf(api, repo_id, transformer_path_in_repo):
-            print(f"✅ {transformer_file} already exists in transformer directory, skipping...")
-        else:
-            file_size = transformer_filepath.stat().st_size / (1024**3)  # GB
-            print(f"📤 Uploading {transformer_file} to models/transformer/ ({file_size:.2f} GB)...")
-
-            # Calculate MD5
-            print("   Calculating checksum...")
-            md5_hash = calculate_md5(transformer_filepath)
-            checksums[f"transformer/{transformer_file}"] = md5_hash
-            print(f"   MD5: {md5_hash}")
-
-            try:
-                # Upload to HF in transformer directory
-                upload_file(
-                    path_or_fileobj=str(transformer_filepath),
-                    path_in_repo=transformer_path_in_repo,
-                    repo_id=repo_id,
-                    token=token,
-                    commit_message=f"Upload transformer model {transformer_file}"
-                )
-                print(f"   ✅ Uploaded successfully to models/transformer/")
-
-            except Exception as e:
-                print(f"   ❌ Transformer upload failed: {e}")
-                return False
-    else:
-        print(f"⚠️  Transformer file not found: {transformer_file}")
-
-    # Upload tokenizer files
-    for filename in tokenizer_files:
-        filepath = main_model_dir / filename
-        path_in_repo = f"models/Wan2.1-Fun-V1.1-1.3B-InP/{filename}"
-        
-        if not filepath.exists():
-            print(f"⚠️  Tokenizer file not found: {filename}")
-            continue
-        
-        # Check if file already exists on HF
-        if check_file_exists_on_hf(api, repo_id, path_in_repo):
-            print(f"✅ {filename} already exists on Hugging Face, skipping...")
-            continue
-        
-        file_size = filepath.stat().st_size / (1024**2)  # MB
-        print(f"📤 Uploading {filename} ({file_size:.2f} MB)...")
-        
-        # Calculate MD5
-        md5_hash = calculate_md5(filepath)
-        checksums[filename] = md5_hash
-        print(f"   MD5: {md5_hash}")
-        
-        try:
-            # Upload to HF
-            upload_file(
-                path_or_fileobj=str(filepath),
-                path_in_repo=path_in_repo,
-                repo_id=repo_id,
-                token=token,
-                commit_message=f"Upload tokenizer file {filename}"
-            )
-            print(f"   ✅ Uploaded successfully")
-            
-        except Exception as e:
-            print(f"   ❌ Upload failed: {e}")
-            return False
-    
-    # Upload wav2vec2 model
-    wav2vec_dir = models_dir / "wav2vec2-base-960h"
-    if wav2vec_dir.exists():
-        print(f"📤 Uploading wav2vec2 model...")
-        try:
-            upload_folder(
-                folder_path=str(wav2vec_dir),
-                path_in_repo="models/wav2vec2-base-960h",
-                repo_id=repo_id,
-                token=token,
-                commit_message="Upload wav2vec2 model"
-            )
-            print("   ✅ wav2vec2 uploaded successfully")
-        except Exception as e:
-            print(f"   ❌ wav2vec2 upload failed: {e}")
-    
-    # Save checksums to file
-    checksums_file = base_dir / "model_checksums.json"
-    import json
-    with open(checksums_file, 'w') as f:
-        json.dump(checksums, f, indent=2)
-    
-    print(f"\n🎉 Upload complete!")
-    print(f"📁 Repository: https://huggingface.co/{repo_id}")
-    print(f"🔐 Checksums saved to: {checksums_file}")
-    
-    return True
-
-def main():
-    print("🤗 Hugging Face Model Uploader")
-    print("=" * 40)
-    print("Repository: FlashbackLabs/FlashbackAvatars")
-    print()
-    
-    # Check if models exist
-    models_dir = Path(__file__).parent / "services" / "renderer" / "models" / "pretrained"
-    main_model_dir = models_dir / "Wan2.1-Fun-V1.1-1.3B-InP"
-    
-    if not main_model_dir.exists():
-        print(f"❌ Models not found at: {main_model_dir}")
-        print("Please ensure your models are downloaded first.")
+    if not has_flame and not has_musetalk:
+        print("\n❌ No models found to upload!")
+        print("\n📋 To upload FLAME:")
+        print("1. Download from: https://flame.is.tue.mpg.de/")
+        print("2. Extract to: third_party/SplattingAvatar/data/FLAME2020/")
+        print("\n📋 To upload MuseTalk:")
+        print("1. cd third_party/MuseTalk")
+        print("2. bash download_weights.sh")
         return
-    
-    print("⚠️  This will upload ~20GB of data to Hugging Face.")
-    print("Make sure you have:")
-    print("1. A Hugging Face account")
-    print("2. Write access to FlashbackLabs/FlashbackAvatars")
-    print("3. A stable internet connection")
+
+    print("\n📦 Models found:")
+    if has_flame:
+        print("   ✅ FLAME models")
+    else:
+        print("   ❌ FLAME models (not found)")
+
+    if has_musetalk:
+        print("   ✅ MuseTalk models")
+    else:
+        print("   ❌ MuseTalk models (not found)")
+
     print()
-    
     response = input("Continue with upload? (y/N): ")
     if response.lower() != 'y':
         print("Upload cancelled.")
         return
-    
-    success = upload_models()
-    
+
+    # Upload models
+    success = True
+
+    if has_flame:
+        if not upload_flame_models(api, repo_id, token, base_dir):
+            success = False
+
+    if has_musetalk:
+        if not upload_musetalk_models(api, repo_id, token, base_dir):
+            print("⚠️  Some MuseTalk files failed to upload")
+
+    print("\n" + "=" * 60)
+
     if success:
-        print("\n✅ All models uploaded successfully!")
-        print("You can now use the download script on cloud instances.")
+        print("🎉 Upload complete!")
+        print(f"📁 Repository: https://huggingface.co/{repo_id}")
+        print("\n✅ Team members can now download with:")
+        print("   python download_models.py")
     else:
-        print("\n❌ Upload failed. Please check errors above.")
+        print("⚠️  Upload completed with some errors")
+        print("Check the output above for details")
 
 if __name__ == "__main__":
     main()
