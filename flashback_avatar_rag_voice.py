@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Flashback Avatar - Real-Time Interactive Avatar Server
-Complete integration: LLM + TTS + MuseTalk Avatar Animation
+Flashback Avatar - Complete RAG + Voice-Enabled Server
+Features: RAG knowledge base, Voice input/output, Real-time avatar
 """
 
 import os
@@ -12,19 +12,117 @@ import asyncio
 import json
 import tempfile
 import shutil
-from typing import Optional
+from typing import Optional, List
 import time
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+# RAG and embeddings
+try:
+    import chromadb
+    from chromadb.utils import embedding_functions
+    CHROMA_AVAILABLE = True
+except ImportError:
+    CHROMA_AVAILABLE = False
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-app = FastAPI(title="Flashback Avatar Server")
+app = FastAPI(title="Flashback Avatar - RAG + Voice")
 
 
-class FlashbackAvatarEngine:
-    """Real-time avatar engine with LLM + TTS + MuseTalk"""
+class RAGKnowledgeBase:
+    """Vector database for Vinay's knowledge"""
+
+    def __init__(self):
+        if not CHROMA_AVAILABLE:
+            print("⚠️  ChromaDB not available. RAG disabled.")
+            self.client = None
+            return
+
+        self.client = chromadb.PersistentClient(path="./rag_db")
+
+        # Use sentence transformers for embeddings
+        self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        )
+
+        # Get or create collection
+        try:
+            self.collection = self.client.get_collection(
+                name="vinay_knowledge",
+                embedding_function=self.embedding_fn
+            )
+            print(f"✅ Loaded RAG knowledge base ({self.collection.count()} documents)")
+        except:
+            self.collection = self.client.create_collection(
+                name="vinay_knowledge",
+                embedding_function=self.embedding_fn
+            )
+            self._load_default_knowledge()
+            print(f"✅ Created RAG knowledge base ({self.collection.count()} documents)")
+
+    def _load_default_knowledge(self):
+        """Load default knowledge about Vinay and Flashback Labs"""
+        knowledge = [
+            {
+                "id": "bio_1",
+                "text": "Vinay Thadem is the Co-Founder of Flashback Labs, a company focused on AI-powered avatar technology and real-time interactive systems.",
+                "metadata": {"category": "bio", "topic": "founder"}
+            },
+            {
+                "id": "company_1",
+                "text": "Flashback Labs specializes in creating photorealistic digital avatars using advanced AI technologies including MuseTalk for lip-sync and 3D Gaussian Splatting for rendering.",
+                "metadata": {"category": "company", "topic": "technology"}
+            },
+            {
+                "id": "tech_1",
+                "text": "Our avatar technology uses MuseTalk for real-time lip synchronization, achieving 30+ FPS on modern GPUs with sub-second latency.",
+                "metadata": {"category": "technology", "topic": "musetalk"}
+            },
+            {
+                "id": "mission_1",
+                "text": "Flashback Labs' mission is to make human-AI interaction more natural and engaging through lifelike digital avatars.",
+                "metadata": {"category": "company", "topic": "mission"}
+            }
+        ]
+
+        for doc in knowledge:
+            self.collection.add(
+                ids=[doc["id"]],
+                documents=[doc["text"]],
+                metadatas=[doc["metadata"]]
+            )
+
+    def search(self, query: str, n_results: int = 3) -> List[str]:
+        """Search knowledge base for relevant context"""
+        if not self.collection:
+            return []
+
+        results = self.collection.query(
+            query_texts=[query],
+            n_results=n_results
+        )
+
+        if results['documents']:
+            return results['documents'][0]
+        return []
+
+    def add_knowledge(self, text: str, category: str = "general"):
+        """Add new knowledge to the database"""
+        if not self.collection:
+            return
+
+        doc_id = f"{category}_{int(time.time())}"
+        self.collection.add(
+            ids=[doc_id],
+            documents=[text],
+            metadatas=[{"category": category, "timestamp": time.time()}]
+        )
+
+
+class FlashbackAvatarRAG:
+    """Complete avatar engine with RAG and voice"""
 
     def __init__(self):
         self.base_dir = Path(__file__).parent
@@ -38,7 +136,12 @@ class FlashbackAvatarEngine:
         self.unet_path = self.musetalk_dir / "models" / "musetalkV15" / "unet.pth"
         self.unet_config = self.musetalk_dir / "models" / "musetalkV15" / "musetalk.json"
 
-        print("🎭 Initializing Flashback Avatar Engine...")
+        print("🎭 Initializing Flashback Avatar (RAG + Voice)...")
+
+        # Initialize RAG
+        self.rag = RAGKnowledgeBase()
+
+        # Check services
         self._check_ollama()
         self._check_musetalk()
         self._load_tts()
@@ -50,8 +153,7 @@ class FlashbackAvatarEngine:
             response = requests.get("http://localhost:11434/api/tags", timeout=2)
             if response.status_code == 200:
                 self.llm_available = True
-                models = response.json().get("models", [])
-                print(f"✅ Ollama LLM connected ({len(models)} models)")
+                print("✅ Ollama LLM connected")
             else:
                 self.llm_available = False
                 print("⚠️  Ollama not responding")
@@ -84,19 +186,34 @@ class FlashbackAvatarEngine:
             print("⚠️  edge-tts not installed. Run: pip install edge-tts")
             self.tts = None
 
-    async def generate_llm_response(self, user_message: str, context: str = "") -> str:
-        """Generate LLM response using Ollama"""
+    async def generate_rag_response(self, user_message: str) -> tuple[str, List[str]]:
+        """Generate LLM response with RAG context"""
         if not self.llm_available:
-            return "I'm sorry, the language model is currently unavailable."
+            return "I'm sorry, the language model is currently unavailable.", []
 
         try:
             import requests
 
-            # Build prompt with context
-            system_prompt = """You are Vinay Thadem, Co-Founder of Flashback Labs. You are a helpful, friendly person who speaks naturally and conversationally.
-Keep responses under 2-3 sentences unless asked for more detail. Respond as yourself, not as an AI or avatar."""
+            # Get relevant context from RAG
+            context_docs = self.rag.search(user_message, n_results=3)
 
-            full_prompt = f"{system_prompt}\n\nUser: {user_message}\nVinay:"
+            # Build context string
+            context_str = "\n".join([f"- {doc}" for doc in context_docs]) if context_docs else ""
+
+            # Build prompt with RAG context
+            system_prompt = """You are Vinay Thadem, Co-Founder of Flashback Labs. You are helpful, friendly, and speak naturally.
+Keep responses under 2-3 sentences unless asked for more detail. Use the provided context when relevant."""
+
+            if context_str:
+                full_prompt = f"""{system_prompt}
+
+Context information:
+{context_str}
+
+User: {user_message}
+Vinay:"""
+            else:
+                full_prompt = f"{system_prompt}\n\nUser: {user_message}\nVinay:"
 
             response = requests.post(
                 "http://localhost:11434/api/generate",
@@ -113,13 +230,13 @@ Keep responses under 2-3 sentences unless asked for more detail. Respond as your
             )
 
             if response.status_code == 200:
-                return response.json()["response"]
+                return response.json()["response"], context_docs
             else:
-                return "I apologize, I'm having trouble generating a response."
+                return "I apologize, I'm having trouble generating a response.", []
 
         except Exception as e:
             print(f"❌ LLM error: {e}")
-            return "I encountered an error while processing your request."
+            return "I encountered an error while processing your request.", []
 
     async def text_to_speech(self, text: str) -> Optional[Path]:
         """Convert text to speech using edge-tts"""
@@ -128,11 +245,9 @@ Keep responses under 2-3 sentences unless asked for more detail. Respond as your
             return None
 
         try:
-            # Create temp audio file
             temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".wav", dir="/tmp")
             output_path = Path(temp_audio.name)
 
-            # Generate speech
             communicate = self.tts.Communicate(text, voice="en-US-GuyNeural")
             await communicate.save(str(output_path))
 
@@ -155,9 +270,10 @@ Keep responses under 2-3 sentences unless asked for more detail. Respond as your
 
             # Create temp config for this audio
             temp_config = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.yaml', dir="/tmp")
+            import yaml
             config_data = {
                 self.avatar_name: {
-                    'preparation': False,  # Use cached avatar
+                    'preparation': False,
                     'bbox_shift': 0,
                     'video_path': 'data/video/vinay_small.mp4',
                     'audio_clips': {
@@ -166,7 +282,6 @@ Keep responses under 2-3 sentences unless asked for more detail. Respond as your
                 }
             }
 
-            import yaml
             yaml.dump(config_data, temp_config)
             temp_config.close()
 
@@ -186,7 +301,7 @@ Keep responses under 2-3 sentences unless asked for more detail. Respond as your
                 cwd=self.musetalk_dir,
                 capture_output=True,
                 text=True,
-                timeout=120  # Increased from 30 to 120 seconds
+                timeout=120
             )
 
             if result.returncode != 0:
@@ -217,14 +332,16 @@ Keep responses under 2-3 sentences unless asked for more detail. Respond as your
             return None
 
     async def process_message(self, user_message: str) -> dict:
-        """Process user message and generate avatar response"""
+        """Process user message with RAG and generate avatar response"""
 
         print(f"\n{'='*60}")
         print(f"💬 User: {user_message}")
 
-        # 1. Generate LLM response
-        llm_response = await self.generate_llm_response(user_message)
+        # 1. Generate LLM response with RAG
+        llm_response, context = await self.generate_rag_response(user_message)
         print(f"🤖 Avatar: {llm_response}")
+        if context:
+            print(f"📚 Used context: {len(context)} documents")
 
         # 2. Convert to speech
         audio_path = await self.text_to_speech(llm_response)
@@ -234,22 +351,27 @@ Keep responses under 2-3 sentences unless asked for more detail. Respond as your
         # 3. Animate avatar
         video_path = self.animate_avatar(audio_path)
 
-        # Cleanup audio
-        audio_path.unlink()
+        # Return audio path for voice output
+        audio_url = f"/audio/{audio_path.name}" if audio_path else None
 
         if not video_path:
+            if audio_path:
+                audio_path.unlink()
             return {"error": "Animation failed"}
 
         # 4. Return results
         return {
             "text": llm_response,
             "video": str(video_path),
-            "video_filename": video_path.name
+            "video_filename": video_path.name,
+            "audio": str(audio_path),
+            "audio_filename": audio_path.name,
+            "context_used": context
         }
 
 
 # Global engine instance
-engine = FlashbackAvatarEngine()
+engine = FlashbackAvatarRAG()
 
 
 @app.websocket("/ws")
@@ -259,28 +381,25 @@ async def websocket_endpoint(websocket: WebSocket):
     print("🔗 Client connected")
 
     try:
-        # Send initial welcome message when client connects
+        # Send initial welcome message
         welcome_text = "Hi! I'm Vinay Thadem, Co-Founder of Flashback Labs. How can I help you today?"
 
-        # Generate welcome video
         await websocket.send_json({"status": "initializing"})
 
         audio_path = await engine.text_to_speech(welcome_text)
         if audio_path:
             video_path = engine.animate_avatar(audio_path)
-            audio_path.unlink()
 
             if video_path:
                 await websocket.send_json({
                     "type": "welcome",
                     "text": welcome_text,
-                    "video_url": f"/videos/{video_path.name}"
+                    "video_url": f"/videos/{video_path.name}",
+                    "audio_url": f"/audio/{audio_path.name}"
                 })
             else:
-                await websocket.send_json({
-                    "type": "welcome",
-                    "text": welcome_text
-                })
+                if audio_path.exists():
+                    audio_path.unlink()
 
         while True:
             # Receive user message
@@ -300,11 +419,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({"error": result["error"]})
                 continue
 
-            # Send result
+            # Send result with audio
             await websocket.send_json({
                 "type": "response",
                 "text": result["text"],
-                "video_url": f"/videos/{result['video_filename']}"
+                "video_url": f"/videos/{result['video_filename']}",
+                "audio_url": f"/audio/{result['audio_filename']}",
+                "context": result.get("context_used", [])
             })
 
     except WebSocketDisconnect:
@@ -320,25 +441,37 @@ async def serve_video(filename: str):
     return {"error": "Video not found"}
 
 
+@app.get("/audio/{filename}")
+async def serve_audio(filename: str):
+    """Serve generated audio files"""
+    audio_path = Path(f"/tmp/{filename}")
+    if audio_path.exists():
+        return FileResponse(audio_path, media_type="audio/wav")
+    return {"error": "Audio not found"}
+
+
+@app.post("/add_knowledge")
+async def add_knowledge(text: str, category: str = "general"):
+    """Add new knowledge to RAG database"""
+    engine.rag.add_knowledge(text, category)
+    return {"status": "added", "category": category}
+
+
 @app.get("/")
 async def get_home():
-    """Serve web interface"""
+    """Serve web interface with voice input/output"""
     html_content = """
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Flashback Avatar - Interactive AI Avatar</title>
+        <title>Flashback Avatar - Voice Enabled</title>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
 
             body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 min-height: 100vh;
                 display: flex;
@@ -392,20 +525,10 @@ async def get_home():
                 font-size: 14px;
             }
 
-            .connected {
-                background: #10b981;
-                color: white;
-            }
-
-            .disconnected {
-                background: #ef4444;
-                color: white;
-            }
-
-            .thinking {
-                background: #f59e0b;
-                color: white;
-            }
+            .connected { background: #10b981; color: white; }
+            .disconnected { background: #ef4444; color: white; }
+            .thinking { background: #f59e0b; color: white; }
+            .listening { background: #8b5cf6; color: white; }
 
             #avatar-container {
                 width: 100%;
@@ -423,6 +546,10 @@ async def get_home():
                 max-width: 100%;
                 max-height: 100%;
                 object-fit: contain;
+            }
+
+            #avatar-audio {
+                display: none;
             }
 
             .placeholder {
@@ -476,6 +603,12 @@ async def get_home():
                 color: white;
             }
 
+            .context-info {
+                font-size: 11px;
+                margin-top: 5px;
+                opacity: 0.8;
+            }
+
             #input-container {
                 display: flex;
                 gap: 10px;
@@ -487,7 +620,6 @@ async def get_home():
                 border: 2px solid #e5e7eb;
                 border-radius: 10px;
                 font-size: 16px;
-                transition: border-color 0.3s;
             }
 
             #user-input:focus {
@@ -495,49 +627,59 @@ async def get_home():
                 border-color: #667eea;
             }
 
-            #send-btn {
+            .btn {
                 padding: 15px 30px;
-                background: #667eea;
-                color: white;
                 border: none;
                 border-radius: 10px;
                 cursor: pointer;
                 font-size: 16px;
                 font-weight: 600;
-                transition: background 0.3s;
+                transition: all 0.3s;
             }
 
-            #send-btn:hover {
-                background: #5568d3;
+            #send-btn {
+                background: #667eea;
+                color: white;
             }
 
-            #send-btn:active {
-                transform: scale(0.98);
+            #send-btn:hover { background: #5568d3; }
+
+            #voice-btn {
+                background: #8b5cf6;
+                color: white;
+                min-width: 60px;
+            }
+
+            #voice-btn.listening {
+                background: #ef4444;
+                animation: pulse 1s infinite;
+            }
+
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
             }
 
             @media (max-width: 1024px) {
-                .container {
-                    flex-direction: column;
-                }
+                .container { flex-direction: column; }
             }
         </style>
     </head>
     <body>
         <div class="header">
             <h1>🎭 Flashback Avatar</h1>
-            <p>Real-Time Interactive AI Avatar powered by Flashback Dev</p>
+            <p>Real-Time Voice-Enabled AI Avatar with RAG Knowledge Base</p>
         </div>
 
         <div class="container">
             <div class="avatar-panel">
                 <div id="status" class="disconnected">Connecting...</div>
                 <div id="avatar-container">
-                    <video id="avatar-video" autoplay muted>
-                        <source src="" type="video/mp4">
-                    </video>
+                    <video id="avatar-video" autoplay muted></video>
+                    <audio id="avatar-audio" autoplay></audio>
                     <div id="placeholder" class="placeholder">
                         <h3>👤 Avatar Ready</h3>
-                        <p>Start a conversation to see the avatar in action</p>
+                        <p>Click connect to begin</p>
                     </div>
                 </div>
             </div>
@@ -546,19 +688,67 @@ async def get_home():
                 <h2>💬 Conversation</h2>
                 <div id="messages"></div>
                 <div id="input-container">
-                    <input type="text" id="user-input" placeholder="Type your message..." />
-                    <button id="send-btn" onclick="sendMessage()">Send</button>
+                    <button id="voice-btn" class="btn" onclick="toggleVoice()">🎤</button>
+                    <input type="text" id="user-input" placeholder="Type or speak..." />
+                    <button id="send-btn" class="btn" onclick="sendMessage()">Send</button>
                 </div>
             </div>
         </div>
 
         <script>
             let ws;
+            let recognition;
+            let isListening = false;
+
             const statusDiv = document.getElementById('status');
             const messagesDiv = document.getElementById('messages');
             const userInput = document.getElementById('user-input');
             const avatarVideo = document.getElementById('avatar-video');
+            const avatarAudio = document.getElementById('avatar-audio');
             const placeholder = document.getElementById('placeholder');
+            const voiceBtn = document.getElementById('voice-btn');
+
+            // Initialize Speech Recognition
+            if ('webkitSpeechRecognition' in window) {
+                recognition = new webkitSpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    userInput.value = transcript;
+                    sendMessage();
+                };
+
+                recognition.onend = () => {
+                    isListening = false;
+                    voiceBtn.classList.remove('listening');
+                    voiceBtn.textContent = '🎤';
+                };
+            }
+
+            function toggleVoice() {
+                if (!recognition) {
+                    alert('Speech recognition not supported in this browser');
+                    return;
+                }
+
+                if (isListening) {
+                    recognition.stop();
+                    isListening = false;
+                    voiceBtn.classList.remove('listening');
+                    voiceBtn.textContent = '🎤';
+                    statusDiv.textContent = '✅ Ready';
+                    statusDiv.className = 'connected';
+                } else {
+                    recognition.start();
+                    isListening = true;
+                    voiceBtn.classList.add('listening');
+                    voiceBtn.textContent = '⏹️';
+                    statusDiv.textContent = '🎤 Listening...';
+                    statusDiv.className = 'listening';
+                }
+            }
 
             function connect() {
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -592,12 +782,12 @@ async def get_home():
 
                     if (data.error) {
                         alert('Error: ' + data.error);
-                        statusDiv.textContent = '✅ Connected';
+                        statusDiv.textContent = '✅ Ready';
                         statusDiv.className = 'connected';
                         return;
                     }
 
-                    // Handle welcome message
+                    // Handle welcome
                     if (data.type === 'welcome') {
                         addMessage(data.text, 'avatar');
 
@@ -608,21 +798,34 @@ async def get_home():
                             avatarVideo.play();
                         }
 
+                        if (data.audio_url) {
+                            avatarAudio.src = data.audio_url + '?t=' + Date.now();
+                            avatarAudio.play();
+                        }
+
                         statusDiv.textContent = '✅ Ready';
                         statusDiv.className = 'connected';
                         return;
                     }
 
-                    // Handle regular response
+                    // Handle response
                     if (data.type === 'response') {
-                        addMessage(data.text, 'avatar');
+                        let contextInfo = '';
+                        if (data.context && data.context.length > 0) {
+                            contextInfo = `<div class="context-info">📚 Used ${data.context.length} knowledge source(s)</div>`;
+                        }
+                        addMessage(data.text + contextInfo, 'avatar');
 
-                        // Play avatar video
                         if (data.video_url) {
                             placeholder.style.display = 'none';
                             avatarVideo.src = data.video_url + '?t=' + Date.now();
                             avatarVideo.style.display = 'block';
                             avatarVideo.play();
+                        }
+
+                        if (data.audio_url) {
+                            avatarAudio.src = data.audio_url + '?t=' + Date.now();
+                            avatarAudio.play();
                         }
 
                         statusDiv.textContent = '✅ Ready';
@@ -634,7 +837,7 @@ async def get_home():
             function addMessage(text, sender) {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message ' + (sender === 'user' ? 'user-message' : 'avatar-message');
-                messageDiv.textContent = (sender === 'user' ? 'You: ' : 'Vinay: ') + text;
+                messageDiv.innerHTML = (sender === 'user' ? 'You: ' : 'Vinay: ') + text;
                 messagesDiv.appendChild(messageDiv);
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
             }
@@ -668,18 +871,21 @@ async def health_check():
         "status": "healthy",
         "llm": engine.llm_available,
         "tts": engine.tts is not None,
-        "musetalk": engine.musetalk_ready
+        "musetalk": engine.musetalk_ready,
+        "rag": engine.rag.client is not None,
+        "knowledge_count": engine.rag.collection.count() if engine.rag.collection else 0
     }
 
 
 def main():
     """Start server"""
     print("\n" + "="*60)
-    print("🚀 Flashback Avatar Server")
+    print("🚀 Flashback Avatar - RAG + Voice Server")
     print("="*60)
     print(f"📱 Web interface: http://localhost:8000")
     print(f"🔧 Health check: http://localhost:8000/health")
     print(f"🎭 Avatar: {engine.avatar_name}")
+    print(f"📚 RAG: {'Enabled' if CHROMA_AVAILABLE else 'Disabled'}")
     print("="*60 + "\n")
 
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
