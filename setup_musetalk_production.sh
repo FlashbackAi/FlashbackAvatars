@@ -63,7 +63,7 @@ echo ""
 if [ -d "rag_db" ]; then
     echo "   RAG database already exists, skipping..."
 else
-    python extract_flashback_knowledge.py
+    python3 extract_flashback_knowledge.py
 fi
 
 echo "✅ RAG knowledge base ready"
@@ -78,7 +78,7 @@ mkdir -p test_voice_outputs
 if [ -f "avatar_input/vinay_audio.wav" ]; then
     echo "   Found voice sample: avatar_input/vinay_audio.wav"
     echo "   Running voice cloning test..."
-    python voice_cloning_vinay.py
+    python3 voice_cloning_vinay.py
     echo "✅ Voice cloning ready"
 else
     echo "⚠️  Warning: avatar_input/vinay_audio.wav not found"
@@ -94,7 +94,7 @@ echo ""
 if [ -f "avatar_input/vinayone.jpg" ]; then
     echo "   Found reference image: avatar_input/vinayone.jpg"
     echo "   Running diffusion test..."
-    python avatar_diffusion_pipeline.py
+    python3 avatar_diffusion_pipeline.py
     echo "✅ Diffusion enhancement ready"
 else
     echo "⚠️  Warning: avatar_input/vinayone.jpg not found"
@@ -223,7 +223,7 @@ echo "   pm2 logs flashback-musetalk"
 echo ""
 echo "   Option 2 - Direct (for testing):"
 echo "   ──────────────────────────────────"
-echo "   python flashback_production_musetalk.py"
+echo "   python3 flashback_production_musetalk.py"
 echo ""
 echo "🌐 Access at:"
 echo "   http://localhost:8000"
