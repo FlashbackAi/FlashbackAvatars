@@ -524,8 +524,8 @@ async def get_home():
     </head>
     <body>
         <div class="header">
-            <h1>🎭 Flashback Avatar</h1>
-            <p>Real-Time Interactive AI Avatar powered by Flashback Dev</p>
+            <h1>Flashback Labs</h1>
+            <p>Real-Time Interactive Avatar</p>
         </div>
 
         <div class="container">

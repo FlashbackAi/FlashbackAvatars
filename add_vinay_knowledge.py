@@ -18,7 +18,7 @@ KNOWLEDGE_BASE = [
         "category": "company"
     },
     {
-        "text": "Our core technology stack includes MuseTalk for real-time lip synchronization, 3D Gaussian Splatting for photorealistic rendering, and advanced LLMs with RAG for intelligent conversations.",
+        "text": "Our core technology enables real-time avatar interactions with advanced AI for intelligent, contextual conversations.",
         "category": "technology"
     },
     {
@@ -26,7 +26,7 @@ KNOWLEDGE_BASE = [
         "category": "applications"
     },
     {
-        "text": "We use RAG (Retrieval-Augmented Generation) to give our avatars access to vast knowledge bases, ensuring accurate and contextual responses.",
+        "text": "Our avatars provide accurate and contextual responses using advanced AI and knowledge retrieval systems.",
         "category": "technology"
     },
     {
