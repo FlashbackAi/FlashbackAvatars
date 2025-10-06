@@ -257,10 +257,11 @@ class MuseTalkAvatarEngine:
         print(f"   Video: {self.musetalk_video}")
 
         # Setup avatar name and paths
+        # Paths are relative to musetalk_dir since subprocess runs with cwd=musetalk_dir
         avatar_name = "vinay_avatar"
         avatar_cache = self.musetalk_dir / "results" / "v15" / "avatars" / avatar_name
-        unet_path = self.musetalk_dir / "models" / "musetalkV15" / "unet.pth"
-        unet_config = self.musetalk_dir / "models" / "musetalkV15" / "musetalk.json"
+        unet_path = "models/musetalkV15/unet.pth"
+        unet_config = "models/musetalkV15/musetalk.json"
 
         # Create temporary YAML config file
         temp_config = tempfile.NamedTemporaryFile(
@@ -284,13 +285,13 @@ class MuseTalkAvatarEngine:
         yaml.dump(config_data, temp_config)
         temp_config.close()
 
-        # Run MuseTalk with correct command structure
+        # Run MuseTalk with correct command structure (use absolute paths)
         cmd = [
             sys.executable, "-m", "scripts.realtime_inference",
             "--inference_config", temp_config.name,
             "--result_dir", "results",
-            "--unet_model_path", str(unet_path),
-            "--unet_config", str(unet_config),
+            "--unet_model_path", str(unet_path.absolute()),
+            "--unet_config", str(unet_config.absolute()),
             "--version", "v15",
             "--fps", "25"
         ]
