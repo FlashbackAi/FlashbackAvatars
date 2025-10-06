@@ -432,11 +432,27 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
 
     try:
-        # Send welcome message
+        # Send welcome message (direct TTS, no LLM processing)
         welcome_text = "Hi! I'm Vinay Thadem, Co-Founder of Flashback Labs."
-        welcome_response = await avatar_system.process_message(welcome_text)
-        welcome_response["type"] = "welcome"
-        await websocket.send_json(welcome_response)
+
+        print(f"\n💬 Vinay (welcome): {welcome_text}")
+
+        # Generate audio directly
+        audio_path = await avatar_system.engine.text_to_speech(welcome_text)
+        print(f"🎙️ Audio: {audio_path.name}")
+
+        # Generate avatar video
+        video_path = avatar_system.engine.animate_avatar(audio_path)
+        print(f"🎬 Video: {video_path.name}")
+
+        # Send welcome response
+        await websocket.send_json({
+            "type": "welcome",
+            "text": welcome_text,
+            "audio_url": f"/audio/{audio_path.name}",
+            "video_url": f"/videos/{video_path.name}",
+            "context_used": False
+        })
 
         # Handle user messages
         while True:
