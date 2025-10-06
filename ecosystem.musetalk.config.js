@@ -17,7 +17,8 @@ module.exports = {
       autorestart: true,
       max_memory_restart: '8G',
       env: {
-        PYTHONUNBUFFERED: '1'
+        PYTHONUNBUFFERED: '1',
+        COQUI_TOS_AGREED: '1'  // Accept Coqui XTTS license (free for non-commercial use)
       }
     }
   ]

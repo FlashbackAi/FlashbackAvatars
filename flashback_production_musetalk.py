@@ -112,6 +112,10 @@ class MuseTalkAvatarEngine:
     def _init_voice_cloner(self):
         """Initialize Vinay's voice cloner with Coqui XTTS."""
         print("🎙️ Initializing voice cloner...")
+
+        # Accept Coqui XTTS license automatically (free for non-commercial use)
+        os.environ["COQUI_TOS_AGREED"] = "1"
+
         try:
             self.voice_cloner = VinayVoiceCloner(
                 reference_audio_path=self.reference_audio
