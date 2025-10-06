@@ -242,10 +242,10 @@ def main():
     success = True
 
     # 1. SplattingAvatar dependencies (FLAME models)
-    print("\n📦 Step 1: SplattingAvatar Dependencies")
-    print("-" * 50)
-    if not download_splatting_avatar_dependencies():
-        success = False
+    # print("\n📦 Step 1: SplattingAvatar Dependencies")
+    # print("-" * 50)
+    # if not download_splatting_avatar_dependencies():
+    #     success = False
 
     # 2. MuseTalk models
     print("\n🎤 Step 2: MuseTalk Models")
