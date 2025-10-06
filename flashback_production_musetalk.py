@@ -433,7 +433,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         # Send welcome message
-        welcome_text = "Hi! I'm Vinay Thadem, Co-Founder of Flashback Labs. How can I help you today?"
+        welcome_text = "Hi! I'm Vinay Thadem, Co-Founder of Flashback Labs."
         welcome_response = await avatar_system.process_message(welcome_text)
         welcome_response["type"] = "welcome"
         await websocket.send_json(welcome_response)
