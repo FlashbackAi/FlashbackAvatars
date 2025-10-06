@@ -362,6 +362,10 @@ Vinay:"""
 # FastAPI app
 app = FastAPI(title="Flashback Avatar Production (MuseTalk)")
 
+# Create static directories if they don't exist
+Path("static/audio").mkdir(parents=True, exist_ok=True)
+Path("static/videos").mkdir(parents=True, exist_ok=True)
+
 # Mount static directories
 app.mount("/audio", StaticFiles(directory="static/audio"), name="audio")
 app.mount("/videos", StaticFiles(directory="static/videos"), name="videos")
