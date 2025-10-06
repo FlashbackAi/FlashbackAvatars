@@ -55,7 +55,7 @@ class AvatarDiffusionPipeline:
         print("✅ Avatar Diffusion Pipeline ready")
 
     def _check_dependencies(self):
-        """Install required packages."""
+        """Check (but don't install) required packages."""
         required = {
             "gfpgan": "gfpgan",
             "realesrgan": "realesrgan",
@@ -65,15 +65,17 @@ class AvatarDiffusionPipeline:
         }
 
         print("📦 Checking dependencies...")
+        missing = []
         for module, package in required.items():
             try:
                 __import__(module)
                 print(f"   ✅ {package}")
             except ImportError:
-                print(f"   📥 Installing {package}...")
-                subprocess.check_call([
-                    sys.executable, "-m", "pip", "install", package
-                ])
+                print(f"   ❌ {package} missing")
+                missing.append(package)
+
+        if missing:
+            raise ImportError(f"Missing packages: {', '.join(missing)}. Install with: pip install {' '.join(missing)}")
 
     def _load_models(self):
         """Load all enhancement models."""
