@@ -93,10 +93,10 @@ class FlashbackAvatarEngine:
             import requests
 
             # Build prompt with context
-            system_prompt = """You are Vinay's digital avatar. You are helpful, friendly, and concise.
-Keep responses under 2-3 sentences unless asked for more detail."""
+            system_prompt = """You are Vinay Thadem. You are a helpful, friendly person who speaks naturally and conversationally.
+Keep responses under 2-3 sentences unless asked for more detail. Respond as yourself, not as an AI or avatar."""
 
-            full_prompt = f"{system_prompt}\n\nUser: {user_message}\nAssistant:"
+            full_prompt = f"{system_prompt}\n\nUser: {user_message}\nVinay:"
 
             response = requests.post(
                 "http://localhost:11434/api/generate",
@@ -186,7 +186,7 @@ Keep responses under 2-3 sentences unless asked for more detail."""
                 cwd=self.musetalk_dir,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=120  # Increased from 30 to 120 seconds
             )
 
             if result.returncode != 0:
