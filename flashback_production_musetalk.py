@@ -248,21 +248,51 @@ class MuseTalkAvatarEngine:
         Returns:
             Path to raw (unenhanced) video
         """
-        # Create unique output filename
-        output_filename = f"raw_{uuid.uuid4().hex}.mp4"
-        output_path = self.video_dir / output_filename
+        import tempfile
+        import yaml
+        import shutil
 
         print(f"   Running MuseTalk inference...")
         print(f"   Audio: {audio_path.name}")
         print(f"   Video: {self.musetalk_video}")
 
-        # Run MuseTalk
+        # Setup avatar name and paths
+        avatar_name = "vinay_avatar"
+        avatar_cache = self.musetalk_dir / "results" / "v15" / "avatars" / avatar_name
+        unet_path = self.musetalk_dir / "models" / "musetalkV15" / "unet.pth"
+        unet_config = self.musetalk_dir / "models" / "musetalkV15" / "musetalk.json"
+
+        # Create temporary YAML config file
+        temp_config = tempfile.NamedTemporaryFile(
+            mode='w',
+            delete=False,
+            suffix='.yaml',
+            dir=str(self.musetalk_dir / "configs")
+        )
+
+        config_data = {
+            avatar_name: {
+                'preparation': False,
+                'bbox_shift': 0,
+                'video_path': 'data/video/vinay_small.mp4',
+                'audio_clips': {
+                    'temp_audio': str(audio_path.absolute())
+                }
+            }
+        }
+
+        yaml.dump(config_data, temp_config)
+        temp_config.close()
+
+        # Run MuseTalk with correct command structure
         cmd = [
-            sys.executable, "-m", "scripts.inference",
-            "--audio_path", str(audio_path.absolute()),
-            "--video_path", str(Path(self.musetalk_video).absolute()),
-            "--bbox_shift", "0",
-            "--result_dir", str(self.video_dir.absolute())
+            sys.executable, "-m", "scripts.realtime_inference",
+            "--inference_config", temp_config.name,
+            "--result_dir", "results",
+            "--unet_model_path", str(unet_path),
+            "--unet_config", str(unet_config),
+            "--version", "v15",
+            "--fps", "25"
         ]
 
         result = subprocess.run(
@@ -273,25 +303,30 @@ class MuseTalkAvatarEngine:
             timeout=120
         )
 
+        # Cleanup temp config
+        try:
+            os.unlink(temp_config.name)
+        except:
+            pass
+
         if result.returncode != 0:
             print(f"❌ MuseTalk error: {result.stderr}")
             raise RuntimeError(f"MuseTalk failed: {result.stderr}")
 
-        # Find the generated video (MuseTalk creates output with timestamp)
-        result_files = sorted(
-            self.video_dir.glob("*.mp4"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True
-        )
+        # Find generated video (MuseTalk creates it in results/v15/avatars/vinay_avatar/vid_output/temp_audio.mp4)
+        output_video = avatar_cache / "vid_output" / "temp_audio.mp4"
 
-        # Get the most recent file (excluding our target output)
-        for candidate in result_files:
-            if candidate != output_path and not candidate.name.startswith("raw_"):
-                candidate.rename(output_path)
-                print(f"   ✅ MuseTalk generated: {output_path.name}")
-                return output_path
+        if not output_video.exists():
+            print(f"❌ Output video not found at: {output_video}")
+            raise RuntimeError("MuseTalk output video not found")
 
-        raise RuntimeError("MuseTalk output video not found")
+        # Copy to our video directory with unique name
+        output_filename = f"raw_{uuid.uuid4().hex}.mp4"
+        output_path = self.video_dir / output_filename
+        shutil.copy(output_video, output_path)
+
+        print(f"   ✅ MuseTalk generated: {output_path.name}")
+        return output_path
 
 
 class FlashbackAvatarProduction:
