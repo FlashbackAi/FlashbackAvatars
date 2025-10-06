@@ -75,11 +75,11 @@ class RAGKnowledgeBase:
                 "text": "Flashback Labs specializes in creating photorealistic digital avatars using advanced AI technologies including MuseTalk for lip-sync and 3D Gaussian Splatting for rendering.",
                 "metadata": {"category": "company", "topic": "technology"}
             },
-            {
-                "id": "tech_1",
-                "text": "Our avatar technology uses MuseTalk for real-time lip synchronization, achieving 30+ FPS on modern GPUs with sub-second latency.",
-                "metadata": {"category": "technology", "topic": "musetalk"}
-            },
+            # {
+            #     "id": "tech_1",
+            #     "text": "Our avatar technology uses MuseTalk for real-time lip synchronization, achieving 30+ FPS on modern GPUs with sub-second latency.",
+            #     "metadata": {"category": "technology", "topic": "musetalk"}
+            # },
             {
                 "id": "mission_1",
                 "text": "Flashback Labs' mission is to make human-AI interaction more natural and engaging through lifelike digital avatars.",
@@ -667,8 +667,8 @@ async def get_home():
     </head>
     <body>
         <div class="header">
-            <h1>🎭 Flashback Avatar</h1>
-            <p>Real-Time Voice-Enabled AI Avatar with RAG Knowledge Base</p>
+            <h1>🎭 Flashback Labs</h1>
+            <p>Real-Time Voice-Enabled AI Avatar</p>
         </div>
 
         <div class="container">
