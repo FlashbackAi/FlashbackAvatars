@@ -27,8 +27,23 @@ import uvicorn
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Import custom modules
-from voice_cloning_vinay import VinayVoiceCloner
-from avatar_diffusion_pipeline import AvatarDiffusionPipeline
+try:
+    from voice_cloning_vinay import VinayVoiceCloner
+    VOICE_CLONING_AVAILABLE = True
+except Exception as e:
+    print(f"⚠️  Voice cloning unavailable: {e}")
+    print("   Will use edge-tts instead")
+    VinayVoiceCloner = None
+    VOICE_CLONING_AVAILABLE = False
+
+try:
+    from avatar_diffusion_pipeline import AvatarDiffusionPipeline
+    DIFFUSION_AVAILABLE = True
+except Exception as e:
+    print(f"⚠️  Diffusion pipeline unavailable: {e}")
+    print("   Will skip enhancement")
+    AvatarDiffusionPipeline = None
+    DIFFUSION_AVAILABLE = False
 
 # RAG imports
 import chromadb
@@ -113,6 +128,11 @@ class MuseTalkAvatarEngine:
         """Initialize Vinay's voice cloner with Coqui XTTS."""
         print("🎙️ Initializing voice cloner...")
 
+        if not VOICE_CLONING_AVAILABLE or VinayVoiceCloner is None:
+            print("   Voice cloning not available, using edge-tts")
+            self.voice_cloner = None
+            return
+
         # Accept Coqui XTTS license automatically (free for non-commercial use)
         os.environ["COQUI_TOS_AGREED"] = "1"
 
@@ -133,6 +153,12 @@ class MuseTalkAvatarEngine:
     ):
         """Initialize comprehensive diffusion enhancement pipeline."""
         print("🎨 Initializing diffusion enhancement pipeline...")
+
+        if not DIFFUSION_AVAILABLE or AvatarDiffusionPipeline is None:
+            print("   Diffusion pipeline not available, skipping enhancement")
+            self.diffusion = None
+            return
+
         try:
             self.diffusion = AvatarDiffusionPipeline(
                 upscale_factor=upscale_factor,
