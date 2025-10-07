@@ -257,11 +257,11 @@ class MuseTalkAvatarEngine:
         print(f"   Video: {self.musetalk_video}")
 
         # Setup avatar name and paths
-        # Paths are relative to musetalk_dir since subprocess runs with cwd=musetalk_dir
+        # Use absolute paths for command-line arguments
         avatar_name = "vinay_avatar"
         avatar_cache = self.musetalk_dir / "results" / "v15" / "avatars" / avatar_name
-        unet_path = "models/musetalkV15/unet.pth"
-        unet_config = "models/musetalkV15/musetalk.json"
+        unet_path = self.musetalk_dir / "models" / "musetalkV15" / "unet.pth"
+        unet_config = self.musetalk_dir / "models" / "musetalkV15" / "musetalk.json"
 
         # Create temporary YAML config file
         temp_config = tempfile.NamedTemporaryFile(
