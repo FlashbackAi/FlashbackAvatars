@@ -334,9 +334,20 @@ class FlashbackAvatarProduction:
         self.rag = RAGKnowledgeBase()
 
         # Initialize MuseTalk avatar engine (no real-time enhancement)
+        # Use pre-enhanced video if available, otherwise use original
+        from pathlib import Path
+        enhanced_video = Path("third_party/MuseTalk/data/video/vinay_enhanced.mp4")
+        reference_video = str(enhanced_video) if enhanced_video.exists() else "third_party/MuseTalk/data/video/vinay_small.mp4"
+
+        if enhanced_video.exists():
+            print("✅ Using pre-enhanced reference video (high quality)")
+        else:
+            print("⚠️  Enhanced reference video not found. Run: python3 avatar_diffusion_pipeline.py --enhance-reference")
+            print("   Using original video for now (lower quality)")
+
         self.engine = MuseTalkAvatarEngine(
             reference_audio="avatar_input/vinay_audio.wav",
-            musetalk_video="third_party/MuseTalk/data/video/vinay_small.mp4",
+            musetalk_video=reference_video,
             use_enhancement=False  # Disabled - use pre-enhanced video instead
         )
 

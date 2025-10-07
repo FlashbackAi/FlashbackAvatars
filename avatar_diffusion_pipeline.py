@@ -385,5 +385,58 @@ def test_diffusion_pipeline():
     print("=" * 70)
 
 
+def enhance_reference_video():
+    """
+    One-time enhancement of reference video for production use.
+    Run this once to create an enhanced version of vinay_small.mp4
+    """
+    print("=" * 70)
+    print("Enhancing Reference Video (One-Time Setup)")
+    print("=" * 70)
+
+    input_video = "third_party/MuseTalk/data/video/vinay_small.mp4"
+    output_video = "third_party/MuseTalk/data/video/vinay_enhanced.mp4"
+
+    from pathlib import Path
+    if Path(output_video).exists():
+        print(f"\n⚠️  Enhanced video already exists: {output_video}")
+        response = input("Re-generate? (y/n): ")
+        if response.lower() != 'y':
+            print("✅ Using existing enhanced video")
+            return output_video
+
+    # Initialize pipeline
+    pipeline = AvatarDiffusionPipeline(
+        upscale_factor=2,
+        face_enhancement_strength=0.8,
+        background_blur=True,
+        use_gpu=True
+    )
+
+    # Enhance the reference video
+    print(f"\n🎨 Enhancing: {input_video}")
+    print("   This will take a few minutes...")
+
+    enhanced = pipeline.enhance_video(
+        input_video_path=input_video,
+        output_video_path=output_video,
+        apply_bg_blur=True,
+        show_progress=True
+    )
+
+    print("\n" + "=" * 70)
+    print("✅ Reference video enhanced successfully!")
+    print(f"   Enhanced video: {output_video}")
+    print("\nNow update flashback_production_musetalk.py to use this enhanced video:")
+    print("   musetalk_video='third_party/MuseTalk/data/video/vinay_enhanced.mp4'")
+    print("=" * 70)
+
+    return enhanced
+
+
 if __name__ == "__main__":
-    test_diffusion_pipeline()
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "--enhance-reference":
+        enhance_reference_video()
+    else:
+        test_diffusion_pipeline()
