@@ -92,25 +92,22 @@ class MuseTalkAvatarEngine:
         self,
         reference_audio: str = "avatar_input/vinay_audio.wav",
         musetalk_video: str = "third_party/MuseTalk/data/video/vinay_small.mp4",
-        upscale_factor: int = 2,
-        enhancement_strength: float = 0.8,
-        background_blur: bool = True
+        use_enhancement: bool = False  # Disabled by default - enhance reference video once offline
     ):
         """
-        Initialize MuseTalk avatar engine with heavy enhancement.
+        Initialize MuseTalk avatar engine.
 
         Args:
             reference_audio: Vinay's voice sample for cloning
-            musetalk_video: Prepared video for MuseTalk
-            upscale_factor: Resolution multiplier (2 or 4)
-            enhancement_strength: Face enhancement strength (0-1)
-            background_blur: Apply professional background blur
+            musetalk_video: Prepared video for MuseTalk (use pre-enhanced version)
+            use_enhancement: Enable real-time enhancement (slow, not recommended)
         """
-        print("🚀 Initializing MuseTalk Avatar Engine with Heavy Enhancement...")
+        print("🚀 Initializing MuseTalk Avatar Engine...")
 
         self.reference_audio = reference_audio
         self.musetalk_video = musetalk_video
         self.musetalk_dir = Path("third_party/MuseTalk")
+        self.use_enhancement = use_enhancement
 
         # Output directories
         self.audio_dir = Path("static/audio")
@@ -120,7 +117,14 @@ class MuseTalkAvatarEngine:
 
         # Initialize components
         self._init_voice_cloner()
-        self._init_diffusion_pipeline(upscale_factor, enhancement_strength, background_blur)
+
+        # Only load diffusion if explicitly enabled
+        if use_enhancement:
+            print("⚠️  Real-time enhancement enabled (slow)")
+            self._init_diffusion_pipeline()
+        else:
+            print("ℹ️  Using pre-enhanced reference video (recommended)")
+            self.diffusion = None
 
         print("✅ MuseTalk Avatar Engine ready!")
 
@@ -145,12 +149,7 @@ class MuseTalkAvatarEngine:
             print("   Falling back to edge-tts")
             self.voice_cloner = None
 
-    def _init_diffusion_pipeline(
-        self,
-        upscale_factor: int,
-        enhancement_strength: float,
-        background_blur: bool
-    ):
+    def _init_diffusion_pipeline(self):
         """Initialize comprehensive diffusion enhancement pipeline."""
         print("🎨 Initializing diffusion enhancement pipeline...")
 
@@ -161,9 +160,9 @@ class MuseTalkAvatarEngine:
 
         try:
             self.diffusion = AvatarDiffusionPipeline(
-                upscale_factor=upscale_factor,
-                face_enhancement_strength=enhancement_strength,
-                background_blur=background_blur,
+                upscale_factor=2,
+                face_enhancement_strength=0.8,
+                background_blur=True,
                 use_gpu=True
             )
         except Exception as e:
@@ -201,42 +200,39 @@ class MuseTalkAvatarEngine:
 
     def animate_avatar(self, audio_path: Path) -> Path:
         """
-        Animate avatar from audio using MuseTalk + Heavy Enhancement.
+        Animate avatar from audio using MuseTalk.
+        Returns video directly (no real-time enhancement).
 
         Args:
             audio_path: Path to audio file
 
         Returns:
-            Path to enhanced video
+            Path to generated video
         """
         print(f"🎬 Generating avatar with MuseTalk...")
 
-        # Step 1: Run MuseTalk to generate raw video
-        raw_video_path = self._run_musetalk(audio_path)
+        # Run MuseTalk to generate video
+        video_path = self._run_musetalk(audio_path)
 
-        # Step 2: Apply heavy diffusion enhancement
-        if self.diffusion and raw_video_path.exists():
-            print("🎨 Applying diffusion enhancement...")
+        # Optional: Apply enhancement if enabled (not recommended for production)
+        if self.use_enhancement and self.diffusion and video_path.exists():
+            print("🎨 Applying real-time enhancement (slow)...")
 
             enhanced_filename = f"video_{uuid.uuid4().hex}.mp4"
             enhanced_path = self.video_dir / enhanced_filename
 
             self.diffusion.enhance_video(
-                input_video_path=str(raw_video_path),
+                input_video_path=str(video_path),
                 output_video_path=str(enhanced_path),
                 apply_bg_blur=True,
-                show_progress=True
+                show_progress=False  # Don't spam logs
             )
 
-            # Clean up raw video
-            raw_video_path.unlink()
-
+            # Clean up unenhanced video
+            video_path.unlink()
             return enhanced_path
-        else:
-            # Return raw video if enhancement fails
-            if not raw_video_path.exists():
-                raise RuntimeError("MuseTalk failed to generate video")
-            return raw_video_path
+
+        return video_path
 
     def _run_musetalk(self, audio_path: Path) -> Path:
         """
@@ -322,7 +318,7 @@ class MuseTalkAvatarEngine:
             raise RuntimeError("MuseTalk output video not found")
 
         # Copy to our video directory with unique name
-        output_filename = f"raw_{uuid.uuid4().hex}.mp4"
+        output_filename = f"video_{uuid.uuid4().hex}.mp4"
         output_path = self.video_dir / output_filename
         shutil.copy(output_video, output_path)
 
@@ -337,13 +333,11 @@ class FlashbackAvatarProduction:
         # Initialize RAG
         self.rag = RAGKnowledgeBase()
 
-        # Initialize MuseTalk avatar engine with heavy enhancement
+        # Initialize MuseTalk avatar engine (no real-time enhancement)
         self.engine = MuseTalkAvatarEngine(
             reference_audio="avatar_input/vinay_audio.wav",
             musetalk_video="third_party/MuseTalk/data/video/vinay_small.mp4",
-            upscale_factor=2,  # 2x resolution boost (512 → 1024)
-            enhancement_strength=0.8,  # Strong face enhancement
-            background_blur=True  # Professional background blur
+            use_enhancement=False  # Disabled - use pre-enhanced video instead
         )
 
         # LLM endpoint

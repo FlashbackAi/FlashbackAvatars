@@ -205,18 +205,19 @@
 <body>
     <div class="header">
         <h1>Flashback Labs</h1>
-        <p>Real-Time Voice-Enabled AI Avatar (MuseTalk + Heavy Diffusion)</p>
+        <!-- <p>Real-Time AI Avatar</p> -->
     </div>
 
     <div class="container">
         <div class="avatar-panel">
-            <div id="status" class="disconnected">Connecting...</div>
+            <div id="status" class="disconnected">Not Connected</div>
             <div id="avatar-container">
-                <video id="avatar-video" autoplay muted></video>
+                <video id="avatar-video" autoplay muted style="display:none;"></video>
                 <audio id="avatar-audio" autoplay></audio>
                 <div id="placeholder" class="placeholder">
-                    <h3>👤 Avatar Ready</h3>
-                    <p>Initializing Vinay...</p>
+                    <h3>Ready</h3>
+                    <p>Click "Connect" to start video call</p>
+                    <button id="connect-btn" class="btn" onclick="connectToAvatar()" style="margin-top: 20px;">Connect</button>
                 </div>
             </div>
         </div>
@@ -225,9 +226,9 @@
             <h2>💬 Conversation with Vinay</h2>
             <div id="messages"></div>
             <div id="input-container">
-                <button id="voice-btn" class="btn" onclick="toggleVoice()">🎤</button>
-                <input type="text" id="user-input" placeholder="Ask about Flashback Labs, TEEPIN, or anything..." />
-                <button id="send-btn" class="btn" onclick="sendMessage()">Send</button>
+                <button id="mic-btn" class="btn" onclick="toggleMic()" disabled>🎤</button>
+                <input type="text" id="user-input" placeholder="Ask about Flashback Labs, TEEPIN, or anything..." disabled />
+                <button id="send-btn" class="btn" onclick="sendMessage()" disabled>Send</button>
             </div>
         </div>
     </div>
@@ -236,6 +237,8 @@
         let ws;
         let recognition;
         let isListening = false;
+        let isMuted = false;
+        let isConnected = false;
 
         const statusDiv = document.getElementById('status');
         const messagesDiv = document.getElementById('messages');
@@ -243,7 +246,9 @@
         const avatarVideo = document.getElementById('avatar-video');
         const avatarAudio = document.getElementById('avatar-audio');
         const placeholder = document.getElementById('placeholder');
-        const voiceBtn = document.getElementById('voice-btn');
+        const micBtn = document.getElementById('mic-btn');
+        const sendBtn = document.getElementById('send-btn');
+        const connectBtn = document.getElementById('connect-btn');
 
         // Initialize Speech Recognition
         if ('webkitSpeechRecognition' in window) {
@@ -259,32 +264,34 @@
 
             recognition.onend = () => {
                 isListening = false;
-                voiceBtn.classList.remove('listening');
-                voiceBtn.textContent = '🎤';
+                micBtn.classList.remove('listening');
+                if (!isMuted) {
+                    micBtn.textContent = '🎤';
+                }
             };
         }
 
-        function toggleVoice() {
-            if (!recognition) {
-                alert('Speech recognition not supported in this browser. Please use Chrome.');
-                return;
-            }
+        function toggleMic() {
+            if (!isConnected) return;
 
-            if (isListening) {
+            isMuted = !isMuted;
+            micBtn.textContent = isMuted ? '🔇' : '🎤';
+            micBtn.style.background = isMuted ? '#ef4444' : '#8b5cf6';
+
+            if (isMuted && isListening) {
                 recognition.stop();
-                isListening = false;
-                voiceBtn.classList.remove('listening');
-                voiceBtn.textContent = '🎤';
-                statusDiv.textContent = '✅ Ready';
-                statusDiv.className = 'connected';
-            } else {
-                recognition.start();
-                isListening = true;
-                voiceBtn.classList.add('listening');
-                voiceBtn.textContent = '⏹️';
-                statusDiv.textContent = '🎤 Listening...';
-                statusDiv.className = 'listening';
             }
+        }
+
+        function connectToAvatar() {
+            if (isConnected) return;
+
+            connectBtn.disabled = true;
+            connectBtn.textContent = 'Connecting...';
+            statusDiv.textContent = '🔌 Connecting...';
+            statusDiv.className = 'thinking';
+
+            connect();
         }
 
         function connect() {
@@ -292,14 +299,33 @@
             ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
             ws.onopen = () => {
-                statusDiv.textContent = '✅ Connected';
+                isConnected = true;
+                statusDiv.textContent = '✅ Connected - Video Call Active';
                 statusDiv.className = 'connected';
+
+                // Enable controls
+                micBtn.disabled = false;
+                userInput.disabled = false;
+                sendBtn.disabled = false;
+
+                // Hide connect button
+                connectBtn.style.display = 'none';
             };
 
             ws.onclose = () => {
-                statusDiv.textContent = '❌ Disconnected - Reconnecting...';
+                isConnected = false;
+                statusDiv.textContent = '❌ Disconnected';
                 statusDiv.className = 'disconnected';
-                setTimeout(connect, 3000);
+
+                // Disable controls
+                micBtn.disabled = true;
+                userInput.disabled = true;
+                sendBtn.disabled = true;
+
+                // Show connect button again
+                connectBtn.style.display = 'block';
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect';
             };
 
             ws.onmessage = (event) => {
@@ -371,8 +397,7 @@
             if (e.key === 'Enter') sendMessage();
         });
 
-        // Initial connection
-        connect();
+        // Don't auto-connect - wait for user to click Connect button
     </script>
 </body>
 </html>
