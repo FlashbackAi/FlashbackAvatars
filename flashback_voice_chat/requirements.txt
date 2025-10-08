@@ -1,0 +1,20 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+websockets==12.0
+python-multipart==0.0.6
+requests==2.31.0
+pydub==0.25.1
+
+# Voice synthesis (REQUIRED - no fallback)
+TTS==0.22.0  # Coqui XTTS for voice cloning
+
+# Speech-to-text
+openai-whisper==20231117
+
+# Audio processing
+pydub==0.25.1
+soundfile==0.12.1
+
+# Fix version conflicts
+numpy>=1.26.0
+transformers<4.36.0  # BeamSearchScorer moved in newer versions

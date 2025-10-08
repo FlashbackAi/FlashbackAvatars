@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flashback Labs</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .call-container {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .avatar-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            color: white;
+        }
+
+        .avatar-name {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+
+        .call-status {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 30px;
+        }
+
+        .call-status.connected {
+            color: #10b981;
+        }
+
+        .call-status.calling {
+            color: #f59e0b;
+        }
+
+        /* Waveform animation */
+        .waveform {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 4px;
+            height: 60px;
+            margin: 30px 0;
+        }
+
+        .waveform.active {
+            display: flex;
+        }
+
+        .wave-bar {
+            width: 4px;
+            background: #667eea;
+            border-radius: 2px;
+            animation: wave 1s ease-in-out infinite;
+        }
+
+        .wave-bar:nth-child(1) { height: 10px; animation-delay: 0s; }
+        .wave-bar:nth-child(2) { height: 20px; animation-delay: 0.1s; }
+        .wave-bar:nth-child(3) { height: 35px; animation-delay: 0.2s; }
+        .wave-bar:nth-child(4) { height: 50px; animation-delay: 0.3s; }
+        .wave-bar:nth-child(5) { height: 35px; animation-delay: 0.4s; }
+        .wave-bar:nth-child(6) { height: 20px; animation-delay: 0.5s; }
+        .wave-bar:nth-child(7) { height: 10px; animation-delay: 0.6s; }
+
+        @keyframes wave {
+            0%, 100% { transform: scaleY(0.5); }
+            50% { transform: scaleY(1); }
+        }
+
+        /* Messages */
+        .messages {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 20px 0;
+            text-align: left;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 10px;
+        }
+
+        .message {
+            margin: 10px 0;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .message.user {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+            max-width: 80%;
+            text-align: right;
+        }
+
+        .message.assistant {
+            background: #e5e7eb;
+            color: #1f2937;
+            max-width: 80%;
+        }
+
+        /* Typing indicator */
+        .typing-indicator {
+            background: #e5e7eb;
+            color: #1f2937;
+            max-width: 80px;
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .typing-indicator .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-indicator .dot:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .typing-indicator .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.7;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+
+        /* Input */
+        .input-container {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .input-container input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .input-container input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .input-container input:disabled {
+            background: #f3f4f6;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        .btn-send {
+            background: #667eea;
+            color: white;
+            padding: 12px 20px;
+        }
+
+        .btn-send:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        .call-controls {
+            display: none;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .call-controls.active {
+            display: flex;
+        }
+
+        .btn-control {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            font-size: 24px;
+            transition: all 0.3s;
+        }
+
+        .btn-mic {
+            background: #8b5cf6;
+            color: white;
+            user-select: none;
+        }
+
+        .btn-mic.recording {
+            background: #ef4444;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .btn-mic:hover:not(.recording) {
+            transform: scale(1.1);
+        }
+
+        .btn-mic:active {
+            transform: scale(0.95);
+        }
+
+        .btn-hangup {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-hangup:hover {
+            transform: scale(1.1);
+        }
+
+        .btn-connect {
+            margin-top: 20px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="call-container">
+        <div class="avatar-circle"></div>
+        <div class="avatar-name">Vinay Thadem</div>
+        <div id="call-status" class="call-status">Not Connected</div>
+
+        <!-- Waveform (shown when Vinay is speaking) -->
+        <div id="waveform" class="waveform">
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+        </div>
+
+        <!-- Messages -->
+        <div id="messages" class="messages"></div>
+
+        <!-- Text Input -->
+        <div class="input-container">
+            <input
+                type="text"
+                id="message-input"
+                placeholder="Type your message..."
+                disabled
+            />
+            <button id="send-btn" class="btn btn-send" onclick="sendMessage()" disabled>
+                Send
+            </button>
+        </div>
+
+        <!-- Connect Button -->
+        <button id="connect-btn" class="btn btn-primary btn-connect" onclick="connect()">
+            Connect
+        </button>
+
+        <!-- Call Controls (mic, hangup) -->
+        <div id="call-controls" class="call-controls">
+            <button id="mic-btn" class="btn-control btn-mic"
+                    onmousedown="startRecording()"
+                    onmouseup="stopRecording()"
+                    onmouseleave="stopRecording()"
+                    ontouchstart="startRecording()"
+                    ontouchend="stopRecording()">
+                🎤
+            </button>
+            <button class="btn-control btn-hangup" onclick="hangup()">
+                📞
+            </button>
+        </div>
+
+        <!-- Help text for mic -->
+        <div id="mic-help" class="mic-help hidden">
+            Press and hold to speak
+        </div>
+
+        <!-- Hidden audio player for voice responses -->
+        <audio id="audio-player" style="display:none;"></audio>
+    </div>
+
+    <script>
+        let ws = null;
+        let isConnected = false;
+        let isMuted = false;
+        let recognition = null;
+
+        const statusDiv = document.getElementById('call-status');
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const connectBtn = document.getElementById('connect-btn');
+        const callControls = document.getElementById('call-controls');
+        const micBtn = document.getElementById('mic-btn');
+        const waveform = document.getElementById('waveform');
+        const audioPlayer = document.getElementById('audio-player');
+
+        // Initialize Audio Recording (Push-to-Talk with MediaRecorder)
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        let audioStream = null;
+
+        // Use MediaRecorder for reliable audio capture
+        async function initMediaRecorder() {
+            try {
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                console.log('Microphone access granted');
+                return true;
+            } catch (err) {
+                console.error('Microphone access denied:', err);
+                alert('Microphone access is required. Please allow microphone access and reload.');
+                return false;
+            }
+        }
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+            connectBtn.disabled = true;
+            connectBtn.textContent = 'Connecting...';
+            statusDiv.textContent = 'Connecting...';
+            statusDiv.className = 'call-status calling';
+
+            ws.onopen = () => {
+                isConnected = true;
+                statusDiv.textContent = 'Connected';
+                statusDiv.className = 'call-status connected';
+
+                // Hide connect button, show controls
+                connectBtn.classList.add('hidden');
+                callControls.classList.add('active');
+
+                // Enable input
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+                messageInput.focus();
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'response') {
+                    // Hide typing indicator
+                    hideTypingIndicator();
+
+                    if(data.transcribed_text)
+                    {
+                        addMessage(data.transcribed_text, 'user');
+                    }
+
+                    // Add message to chat
+                    addMessage(data.text, 'assistant');
+
+                    // Play voice response
+                    if (data.audio_url) {
+                        playVoice(data.audio_url);
+                    }
+                }
+            };
+
+            ws.onclose = () => {
+                isConnected = false;
+                statusDiv.textContent = 'Disconnected';
+                statusDiv.className = 'call-status';
+
+                // Reset UI
+                connectBtn.classList.remove('hidden');
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect';
+                callControls.classList.remove('active');
+                messageInput.disabled = true;
+                sendBtn.disabled = true;
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function hangup() {
+            if (ws) {
+                ws.close();
+            }
+        }
+
+        // Push-to-Talk: Hold to record, release to send
+        async function startRecording() {
+            if (!isConnected || isRecording) return;
+
+            console.log('Starting recording...');
+
+            // Initialize microphone if not done
+            if (!audioStream) {
+                const granted = await initMediaRecorder();
+                if (!granted) return;
+            }
+
+            // Start recording
+            audioChunks = [];
+            mediaRecorder = new MediaRecorder(audioStream);
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                console.log('Recording stopped, uploading audio...');
+
+                // Show typing indicator
+                showTypingIndicator();
+
+                // Reset mic button
+                micBtn.textContent = '🎤';
+                micBtn.classList.remove('recording');
+                isRecording = false;
+
+                // Create blob from chunks
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+
+                // Send to server for transcription
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+
+                try {
+                    const response = await fetch('/api/voice-message', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    // Hide typing indicator
+                    hideTypingIndicator();
+
+                    if (data.type === 'response') {
+                        // Show transcribed user message first (if available)
+                        if (data.transcribed_text) {
+                            addMessage(data.transcribed_text, 'user');
+                        }
+
+                        // Then add Vinay's response
+                        addMessage(data.text, 'assistant');
+
+                        // Play voice response
+                        if (data.audio_url) {
+                            playVoice(data.audio_url);
+                        }
+                    } else if (data.error) {
+                        console.error('Server error:', data.error);
+                        alert('Error: ' + data.error);
+                    }
+                } catch (err) {
+                    console.error('Upload error:', err);
+                    hideTypingIndicator();
+                    alert('Failed to send audio. Please try again.');
+                }
+            };
+
+            // Start recording
+            mediaRecorder.start();
+            isRecording = true;
+            micBtn.textContent = '🔴';
+            micBtn.classList.add('recording');
+            console.log('Recording started');
+        }
+
+        function stopRecording() {
+            if (!isConnected || !isRecording || !mediaRecorder) return;
+
+            console.log('Stopping recording...');
+            mediaRecorder.stop();
+        }
+
+        // Old toggle function (kept for compatibility)
+        function toggleMic() {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || !isConnected) return;
+
+            // Add user message to chat
+            addMessage(message, 'user');
+
+            // Show typing indicator
+            showTypingIndicator();
+
+            // Send to server
+            ws.send(JSON.stringify({
+                type: 'text',
+                message: message
+            }));
+
+            // Clear input
+            messageInput.value = '';
+        }
+
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            messageDiv.textContent = text;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            // Remove existing typing indicator if any
+            hideTypingIndicator();
+
+            // Create typing indicator
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'typing-indicator';
+            typingDiv.id = 'typing-indicator';
+
+            // Add 3 dots
+            for (let i = 0; i < 3; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'dot';
+                typingDiv.appendChild(dot);
+            }
+
+            messagesDiv.appendChild(typingDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        function playVoice(audioUrl) {
+            // Show waveform animation
+            waveform.classList.add('active');
+
+            // Play audio
+            audioPlayer.src = audioUrl + '?t=' + Date.now();
+            audioPlayer.play();
+
+            // Hide waveform when audio ends
+            audioPlayer.onended = () => {
+                waveform.classList.remove('active');
+            };
+        }
+
+        // Enter key to send
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+    </script>
+</body>
+</html>

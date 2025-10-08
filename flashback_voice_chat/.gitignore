@@ -1,0 +1,32 @@
+# Models directory (download from Hugging Face)
+models/
+
+# Audio files
+static/audio/*.wav
+static/audio/*.mp3
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
