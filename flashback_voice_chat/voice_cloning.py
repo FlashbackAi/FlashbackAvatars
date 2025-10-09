@@ -111,21 +111,28 @@ class VoiceCloner:
         if self.speaker_embedding:
             try:
                 # Direct inference with cached embeddings (faster)
-                # Using settings from config.py for best accent preservation
+                # Using settings from config.py for best accent preservation (matches web app)
+                import time
+                start_time = time.time()
+
                 wav = self.tts_engine.synthesizer.tts_model.inference(
                     text=text,
                     language=language,
                     gpt_cond_latent=self.speaker_embedding["gpt_cond_latent"],
                     speaker_embedding=self.speaker_embedding["speaker_embedding"],
-                    temperature=VOICE_SETTINGS["temperature"],
+                    temperature=VOICE_SETTINGS["temperature"],  # 0.2 for strict accent cloning
                     length_penalty=VOICE_SETTINGS["length_penalty"],
                     repetition_penalty=VOICE_SETTINGS["repetition_penalty"],
                     top_k=VOICE_SETTINGS["top_k"],
                     top_p=VOICE_SETTINGS["top_p"],
                     speed=VOICE_SETTINGS["speed"],
                     enable_text_splitting=VOICE_SETTINGS["enable_text_splitting"],
-                    do_sample=VOICE_SETTINGS["do_sample"]
+                    do_sample=VOICE_SETTINGS["do_sample"],
+                    num_beams=1  # Fastest generation (no beam search)
                 )
+
+                generation_time = (time.time() - start_time) * 1000  # Convert to ms
+                print(f"   ⚡ Generation time: {generation_time:.0f}ms")
 
                 # Save audio
                 import torchaudio

@@ -173,9 +173,13 @@
 
         /* Input */
         .input-container {
-            display: flex;
+            display: none; /* Hidden until connected */
             gap: 10px;
             margin: 20px 0;
+        }
+
+        .input-container.active {
+            display: flex;
         }
 
         .input-container input {
@@ -275,6 +279,20 @@
             transform: scale(0.95);
         }
 
+        .btn-mic:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* Mic help text */
+        .mic-help {
+            text-align: center;
+            font-size: 13px;
+            color: #6b7280;
+            margin-top: 10px;
+        }
+
         .btn-hangup {
             background: #ef4444;
             color: white;
@@ -313,15 +331,14 @@
         <!-- Messages -->
         <div id="messages" class="messages"></div>
 
-        <!-- Text Input -->
-        <div class="input-container">
+        <!-- Text Input (hidden until connected) -->
+        <div id="input-container" class="input-container">
             <input
                 type="text"
                 id="message-input"
                 placeholder="Type your message..."
-                disabled
             />
-            <button id="send-btn" class="btn btn-send" onclick="sendMessage()" disabled>
+            <button id="send-btn" class="btn btn-send" onclick="sendMessage()">
                 Send
             </button>
         </div>
@@ -346,9 +363,9 @@
             </button>
         </div>
 
-        <!-- Help text for mic -->
+        <!-- Help text for mic (shown when connected) -->
         <div id="mic-help" class="mic-help hidden">
-            Press and hold to speak
+            Press and hold mic to speak
         </div>
 
         <!-- Hidden audio player for voice responses -->
@@ -360,14 +377,17 @@
         let isConnected = false;
         let isMuted = false;
         let recognition = null;
+        let isProcessing = false; // Track if we're waiting for response
 
         const statusDiv = document.getElementById('call-status');
         const messagesDiv = document.getElementById('messages');
         const messageInput = document.getElementById('message-input');
         const sendBtn = document.getElementById('send-btn');
         const connectBtn = document.getElementById('connect-btn');
+        const inputContainer = document.getElementById('input-container');
         const callControls = document.getElementById('call-controls');
         const micBtn = document.getElementById('mic-btn');
+        const micHelp = document.getElementById('mic-help');
         const waveform = document.getElementById('waveform');
         const audioPlayer = document.getElementById('audio-player');
 
@@ -404,13 +424,13 @@
                 statusDiv.textContent = 'Connected';
                 statusDiv.className = 'call-status connected';
 
-                // Hide connect button, show controls
+                // Hide connect button, show controls and input
                 connectBtn.classList.add('hidden');
                 callControls.classList.add('active');
+                inputContainer.classList.add('active');
+                micHelp.classList.remove('hidden');
 
-                // Enable input
-                messageInput.disabled = false;
-                sendBtn.disabled = false;
+                // Focus input
                 messageInput.focus();
             };
 
@@ -420,6 +440,10 @@
                 if (data.type === 'response') {
                     // Hide typing indicator
                     hideTypingIndicator();
+
+                    // Re-enable mic button
+                    isProcessing = false;
+                    micBtn.disabled = false;
 
                     if(data.transcribed_text)
                     {
@@ -438,6 +462,7 @@
 
             ws.onclose = () => {
                 isConnected = false;
+                isProcessing = false;
                 statusDiv.textContent = 'Disconnected';
                 statusDiv.className = 'call-status';
 
@@ -446,8 +471,8 @@
                 connectBtn.disabled = false;
                 connectBtn.textContent = 'Connect';
                 callControls.classList.remove('active');
-                messageInput.disabled = true;
-                sendBtn.disabled = true;
+                inputContainer.classList.remove('active');
+                micHelp.classList.add('hidden');
             };
 
             ws.onerror = (error) => {
@@ -463,7 +488,7 @@
 
         // Push-to-Talk: Hold to record, release to send
         async function startRecording() {
-            if (!isConnected || isRecording) return;
+            if (!isConnected || isRecording || isProcessing) return;
 
             console.log('Starting recording...');
 
@@ -486,8 +511,10 @@
             mediaRecorder.onstop = async () => {
                 console.log('Recording stopped, uploading audio...');
 
-                // Show typing indicator
+                // Show typing indicator and disable mic
                 showTypingIndicator();
+                isProcessing = true;
+                micBtn.disabled = true;
 
                 // Reset mic button
                 micBtn.textContent = '🎤';
@@ -509,8 +536,10 @@
 
                     const data = await response.json();
 
-                    // Hide typing indicator
+                    // Hide typing indicator and re-enable mic
                     hideTypingIndicator();
+                    isProcessing = false;
+                    micBtn.disabled = false;
 
                     if (data.type === 'response') {
                         // Show transcribed user message first (if available)
@@ -532,6 +561,8 @@
                 } catch (err) {
                     console.error('Upload error:', err);
                     hideTypingIndicator();
+                    isProcessing = false;
+                    micBtn.disabled = false;
                     alert('Failed to send audio. Please try again.');
                 }
             };
@@ -562,13 +593,15 @@
 
         function sendMessage() {
             const message = messageInput.value.trim();
-            if (!message || !isConnected) return;
+            if (!message || !isConnected || isProcessing) return;
 
             // Add user message to chat
             addMessage(message, 'user');
 
-            // Show typing indicator
+            // Show typing indicator and disable mic
             showTypingIndicator();
+            isProcessing = true;
+            micBtn.disabled = true;
 
             // Send to server
             ws.send(JSON.stringify({

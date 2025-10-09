@@ -4,12 +4,13 @@ Adjust these settings to fine-tune voice quality and accent
 """
 
 # Voice Cloning Settings
+# These settings match Coqui web app (https://coquitts.com/generate) for best accent cloning
 VOICE_SETTINGS = {
     # Temperature: Lower = more consistent/accurate accent (0.1-1.0)
-    # 0.65: Recommended for accent preservation
-    # 0.75: More natural variation
-    # 0.85: More expressive but less accurate
-    "temperature": 0.65,
+    # 0.1-0.3: Web app setting - BEST for accent preservation (strict cloning)
+    # 0.65: More natural but loses accent
+    # Try 0.1 for strongest accent cloning (may sound less natural)
+    "temperature": 0.1,  # Changed from 0.65 to match web app
 
     # Repetition Penalty: Higher = less repetitive (1.0-20.0)
     # 10.0: Coqui.ai default, good for natural speech
