@@ -8,7 +8,7 @@ import json
 import uuid
 from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -133,9 +133,13 @@ app.add_middleware(
 
 # Create static directories
 Path("static/audio").mkdir(parents=True, exist_ok=True)
+Path("static/assets").mkdir(parents=True, exist_ok=True)
+
 
 # Mount static files
 app.mount("/audio", StaticFiles(directory="static/audio"), name="audio")
+app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
+
 
 # Initialize server
 voice_server = None
@@ -175,7 +179,7 @@ async def get_ui():
     if html_path.exists():
         return FileResponse(html_path)
     else:
-        return {"error": "UI not found"}
+        return {"error": "UI (index.html) not found in the static directory."}
 
 
 @app.post("/api/text-message")

@@ -1,616 +1,404 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Flashback Labs</title>
+    <title>Flashback AI Twin</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        :root {
+            --background-base: #242247;
+            --background-light: #2c295a; /* Slightly lighter for gradient */
+            --background-dark: #1e1d3a;  /* Slightly darker for gradient */
+            --glass-color: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --text-light: #ffffff;
+            --text-medium: #d1d5db;
+            --btn-red: #ef4444;
+            --blur-intensity: 10px;
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            color: var(--text-light);
             display: flex;
-            align-items: center;
-            justify-content: center;
+            flex-direction: column;
+            height: 100vh;
+            padding: 20px;
+            overflow: hidden; /* Hide overflow from animated background */
+            position: relative; /* For the pseudo-element background */
+            background-color: var(--background-base); /* Fallback */
         }
 
-        .call-container {
-            width: 100%;
-            max-width: 400px;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        /* Animated Gradient Background */
+        body::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                135deg,
+                var(--background-dark) 0%,
+                var(--background-base) 25%,
+                var(--background-light) 50%,
+                var(--background-base) 75%,
+                var(--background-dark) 100%
+            );
+            background-size: 200% 200%;
+            animation: gradient-animation 20s ease infinite; /* Subtle movement */
+            z-index: -1; /* Behind all content */
+        }
+
+        @keyframes gradient-animation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .top-bar {
             text-align: center;
+            padding-bottom: 20px;
         }
-
-        .avatar-circle {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            margin: 0 auto 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 48px;
-            color: white;
-        }
-
-        .avatar-name {
-            font-size: 24px;
-            font-weight: 600;
-            color: #1f2937;
-            margin-bottom: 10px;
-        }
-
-        .call-status {
-            font-size: 14px;
-            color: #6b7280;
-            margin-bottom: 30px;
-        }
-
-        .call-status.connected {
-            color: #10b981;
-        }
-
-        .call-status.calling {
-            color: #f59e0b;
-        }
-
-        /* Waveform animation */
-        .waveform {
-            display: none;
-            justify-content: center;
-            align-items: center;
-            gap: 4px;
-            height: 60px;
-            margin: 30px 0;
-        }
-
-        .waveform.active {
-            display: flex;
-        }
-
-        .wave-bar {
-            width: 4px;
-            background: #667eea;
-            border-radius: 2px;
-            animation: wave 1s ease-in-out infinite;
-        }
-
-        .wave-bar:nth-child(1) { height: 10px; animation-delay: 0s; }
-        .wave-bar:nth-child(2) { height: 20px; animation-delay: 0.1s; }
-        .wave-bar:nth-child(3) { height: 35px; animation-delay: 0.2s; }
-        .wave-bar:nth-child(4) { height: 50px; animation-delay: 0.3s; }
-        .wave-bar:nth-child(5) { height: 35px; animation-delay: 0.4s; }
-        .wave-bar:nth-child(6) { height: 20px; animation-delay: 0.5s; }
-        .wave-bar:nth-child(7) { height: 10px; animation-delay: 0.6s; }
-
-        @keyframes wave {
-            0%, 100% { transform: scaleY(0.5); }
-            50% { transform: scaleY(1); }
-        }
-
-        /* Messages */
-        .messages {
-            max-height: 300px;
-            overflow-y: auto;
-            margin: 20px 0;
-            text-align: left;
-            padding: 15px;
-            background: #f9fafb;
-            border-radius: 10px;
-        }
-
-        .message {
-            margin: 10px 0;
-            padding: 10px 12px;
-            border-radius: 10px;
-            font-size: 14px;
-            line-height: 1.4;
-        }
-
-        .message.user {
-            background: #667eea;
-            color: white;
-            margin-left: auto;
-            max-width: 80%;
-            text-align: right;
-        }
-
-        .message.assistant {
-            background: #e5e7eb;
-            color: #1f2937;
-            max-width: 80%;
-        }
-
-        /* Typing indicator */
-        .typing-indicator {
-            background: #e5e7eb;
-            color: #1f2937;
-            max-width: 80px;
-            padding: 10px 15px;
-            border-radius: 10px;
-            margin: 10px 0;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .typing-indicator .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #667eea;
-            animation: typing 1.4s infinite;
-        }
-
-        .typing-indicator .dot:nth-child(1) {
-            animation-delay: 0s;
-        }
-
-        .typing-indicator .dot:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-
-        .typing-indicator .dot:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-
-        @keyframes typing {
-            0%, 60%, 100% {
-                transform: translateY(0);
-                opacity: 0.7;
-            }
-            30% {
-                transform: translateY(-10px);
-                opacity: 1;
-            }
-        }
-
-        /* Input */
-        .input-container {
-            display: none; /* Hidden until connected */
-            gap: 10px;
-            margin: 20px 0;
-        }
-
-        .input-container.active {
-            display: flex;
-        }
-
-        .input-container input {
+        .top-bar img { height: 32px; }
+        
+        /* Main Layout */
+        .main-container {
             flex: 1;
-            padding: 12px;
-            border: 2px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 14px;
-        }
-
-        .input-container input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .input-container input:disabled {
-            background: #f3f4f6;
-        }
-
-        /* Buttons */
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            background: #5568d3;
-        }
-
-        .btn-send {
-            background: #667eea;
-            color: white;
-            padding: 12px 20px;
-        }
-
-        .btn-send:hover:not(:disabled) {
-            background: #5568d3;
-        }
-
-        .call-controls {
-            display: none;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .call-controls.active {
             display: flex;
+            gap: 20px;
+            height: calc(100% - 60px);
+            z-index: 1; /* Ensure content is above the animated background */
         }
 
-        .btn-control {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            border: none;
+        .left-panel, .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .left-panel { flex: 2; }
+        .right-panel { flex: 1; }
+
+        /* --- Glass Effect Styling --- */
+        .glass-panel {
+            background: var(--glass-color);
+            backdrop-filter: blur(var(--blur-intensity));
+            -webkit-backdrop-filter: blur(var(--blur-intensity)); /* For Safari */
+            border-radius: 24px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+            overflow: hidden; /* Important for background blend with glass */
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Left Panel - AI Avatar and Chat */
+        .avatar-main-panel { flex: 1; }
+
+        #avatar-video, #selfie-video { width: 100%; height: 100%; object-fit: cover; }
+        .placeholder-icon { color: var(--text-medium); opacity: 0.5; }
+
+        /* Chat Overlay */
+        .chat-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.6) 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #messages { max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+        .message { padding: 8px 12px; border-radius: 12px; max-width: 80%; word-wrap: break-word; }
+        .message.user { background: rgba(255, 255, 255, 0.8); color: #1f2937; margin-left: auto; text-align: right; }
+        .message.assistant { background: var(--glass-color); color: white; margin-right: auto; }
+        .typing-indicator { background: var(--glass-color); max-width: 80px; padding: 10px 15px; border-radius: 12px; display: flex; align-items: center; gap: 4px; }
+        .typing-indicator .dot { width: 8px; height: 8px; border-radius: 50%; background: white; animation: typing 1.4s infinite; }
+        .typing-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing { 0%, 60%, 100% { transform: translateY(0); opacity: 0.7; } 30% { transform: translateY(-8px); opacity: 1; } }
+
+        #input-container { display: flex; gap: 10px; background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 5px; border: 1px solid var(--glass-border); }
+        #message-input { flex: 1; background: transparent; border: none; padding: 10px; color: white; font-size: 16px; }
+        #message-input::placeholder { color: var(--text-medium); }
+        #message-input:focus { outline: none; }
+        #send-btn { background: white; color: #333; border: none; border-radius: 8px; padding: 0 20px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+        #send-btn:hover { background: #eee; }
+
+        /* Right Panel - Selfie and Controls */
+        .selfie-panel { flex: 3; }
+        .controls-panel { flex: 1; flex-direction: column; justify-content: center; padding: 20px; gap: 15px; }
+
+        .profile-info { display: flex; align-items: center; gap: 15px; }
+        .profile-info img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; }
+        .name-status { display: flex; flex-direction: column; }
+        .user-name { font-weight: bold; font-size: 1.1rem; }
+        #connection-status { font-size: 0.9rem; color: var(--text-medium); }
+
+        .button-group { width: 100%; display: flex; justify-content: center; gap: 15px; }
+        #connect-btn { width: 100%; padding: 15px; font-size: 1rem; font-weight: bold; border-radius: 12px; border: none; cursor: pointer; background-color: white; color: #333; transition: background 0.2s; }
+        #connect-btn:hover { background: #eee; }
+
+        /* Pill-shaped buttons */
+        .call-btn {
+            background: var(--glass-color);
+            border: 1px solid var(--glass-border);
+            /* Adjust width and padding for pill shape */
+            width: auto; /* Allow width to adjust to content + padding */
+            padding: 12px 20px; /* Vertical and horizontal padding */
+            border-radius: 9999px; /* Max border-radius for pill shape */
             cursor: pointer;
-            font-size: 24px;
-            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
         }
+        .call-btn:hover { background: rgba(255, 255, 255, 0.2); }
+        .call-btn img { width: 24px; height: 24px; }
+        #mic-toggle-btn.recording { background: var(--btn-red); }
+        #disconnect-btn { background: var(--btn-red); }
 
-        .btn-mic {
-            background: #8b5cf6;
-            color: white;
-            user-select: none;
-        }
+        /* Hide elements initially */
+        #avatar-video, #call-controls { display: none; }
+        .hidden { display: none !important; }
 
-        .btn-mic.recording {
-            background: #ef4444;
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
-
-        .btn-mic:hover:not(.recording) {
-            transform: scale(1.1);
-        }
-
-        .btn-mic:active {
-            transform: scale(0.95);
-        }
-
-        .btn-mic:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
-
-        /* Mic help text */
-        .mic-help {
-            text-align: center;
-            font-size: 13px;
-            color: #6b7280;
-            margin-top: 10px;
-        }
-
-        .btn-hangup {
-            background: #ef4444;
-            color: white;
-        }
-
-        .btn-hangup:hover {
-            transform: scale(1.1);
-        }
-
-        .btn-connect {
-            margin-top: 20px;
-        }
-
-        .hidden {
-            display: none !important;
-        }
+        @media (max-width: 768px) { .main-container { flex-direction: column; } }
     </style>
 </head>
 <body>
-    <div class="call-container">
-        <div class="avatar-circle"></div>
-        <div class="avatar-name">Vinay Thadem</div>
-        <div id="call-status" class="call-status">Not Connected</div>
-
-        <!-- Waveform (shown when Vinay is speaking) -->
-        <div id="waveform" class="waveform">
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
+    <header class="top-bar">
+        <img src="assets/logo.png" alt="Logo">
+    </header>
+    <main class="main-container">
+        <div class="left-panel">
+            <div class="glass-panel avatar-main-panel">
+                <video id="avatar-video" autoplay muted></video>
+                <audio id="audio-player" autoplay></audio>
+                <div id="avatar-placeholder" class="placeholder-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"/></svg>
+                </div>
+                <div class="chat-overlay">
+                    <div id="messages"></div>
+                    <div id="input-container" class="hidden">
+                        <input type="text" id="message-input" placeholder="Or type a message..." />
+                        <button id="send-btn" onclick="sendMessage()">Send</button>
+                    </div>
+                </div>
+            </div>
         </div>
-
-        <!-- Messages -->
-        <div id="messages" class="messages"></div>
-
-        <!-- Text Input (hidden until connected) -->
-        <div id="input-container" class="input-container">
-            <input
-                type="text"
-                id="message-input"
-                placeholder="Type your message..."
-            />
-            <button id="send-btn" class="btn btn-send" onclick="sendMessage()">
-                Send
-            </button>
+        <div class="right-panel">
+            <div class="glass-panel selfie-panel">
+                <video id="selfie-video" autoplay playsinline muted></video>
+                <div id="selfie-placeholder" class="placeholder-icon">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0V7h-1a.5.5 0 0 1-.5-.5"/><path d="M4 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0V7H4.5a.5.5 0 0 1-.5-.5m-1.493 5.428-1.28-1.28A.5.5 0 0 1 1.5 10h13a.5.5 0 0 1 .354.854l-1.28 1.28a.5.5 0 0 1-.707 0L11.5 11.707l-1.414 1.414a.5.5 0 0 1-.707 0L8.5 12.207l-1.414 1.414a.5.5 0 0 1-.707 0L5.5 11.707l-1.414 1.414a.5.5 0 0 1-.707 0z"/><path d="M.5 0A.5.5 0 0 0 0 .5v15a.5.5 0 0 0 .5.5h15a.5.5 0 0 0 .5-.5V.5A.5.5 0 0 0 15.5 0zM1 1h14v14H1z"/></svg>
+                </div>
+            </div>
+            <div class="glass-panel controls-panel">
+                <div class="profile-info">
+                    <img src="assets/profile.jpg" alt="Profile Picture">
+                    <div class="name-status">
+                        <span class="user-name">Vinay</span>
+                        <span id="connection-status">Ready to connect</span>
+                    </div>
+                </div>
+                <div id="initial-controls" class="button-group">
+                    <button id="connect-btn" onclick="connect()">Connect</button>
+                </div>
+                <div id="call-controls" class="button-group">
+                    <button id="video-toggle-btn" class="call-btn" onclick="toggleVideo()">
+                        <img id="video-icon" src="assets/video-on.png" alt="Video">
+                    </button>
+                    <button id="mic-toggle-btn" class="call-btn"
+                        onmousedown="startRecording()" onmouseup="stopRecording()" onmouseleave="stopRecording()"
+                        ontouchstart="startRecording()" ontouchend="stopRecording()">
+                        <img id="mic-icon" src="assets/mic-on.png" alt="Microphone">
+                    </button>
+                    <button id="disconnect-btn" class="call-btn" onclick="disconnect()">
+                        <img src="assets/disconnect.png" alt="Disconnect">
+                    </button>
+                </div>
+            </div>
         </div>
-
-        <!-- Connect Button -->
-        <button id="connect-btn" class="btn btn-primary btn-connect" onclick="connect()">
-            Connect
-        </button>
-
-        <!-- Call Controls (mic, hangup) -->
-        <div id="call-controls" class="call-controls">
-            <button id="mic-btn" class="btn-control btn-mic"
-                    onmousedown="startRecording()"
-                    onmouseup="stopRecording()"
-                    onmouseleave="stopRecording()"
-                    ontouchstart="startRecording()"
-                    ontouchend="stopRecording()">
-                🎤
-            </button>
-            <button class="btn-control btn-hangup" onclick="hangup()">
-                📞
-            </button>
-        </div>
-
-        <!-- Help text for mic (shown when connected) -->
-        <div id="mic-help" class="mic-help hidden">
-            Press and hold mic to speak
-        </div>
-
-        <!-- Hidden audio player for voice responses -->
-        <audio id="audio-player" style="display:none;"></audio>
-    </div>
+    </main>
 
     <script>
-        let ws = null;
-        let isConnected = false;
-        let isMuted = false;
-        let recognition = null;
-        let isProcessing = false; // Track if we're waiting for response
+        // State variables
+        let ws = null, isConnected = false, isProcessing = false, isVideoOn = true;
+        let localStream, mediaRecorder, audioChunks = [], isRecording = false;
 
-        const statusDiv = document.getElementById('call-status');
+        // Element selectors
+        const connectionStatus = document.getElementById('connection-status');
         const messagesDiv = document.getElementById('messages');
         const messageInput = document.getElementById('message-input');
-        const sendBtn = document.getElementById('send-btn');
-        const connectBtn = document.getElementById('connect-btn');
-        const inputContainer = document.getElementById('input-container');
-        const callControls = document.getElementById('call-controls');
-        const micBtn = document.getElementById('mic-btn');
-        const micHelp = document.getElementById('mic-help');
-        const waveform = document.getElementById('waveform');
+        const avatarVideo = document.getElementById('avatar-video');
         const audioPlayer = document.getElementById('audio-player');
+        const avatarPlaceholder = document.getElementById('avatar-placeholder');
+        const selfieVideo = document.getElementById('selfie-video');
+        const selfiePlaceholder = document.getElementById('selfie-placeholder');
+        const initialControls = document.getElementById('initial-controls');
+        const callControls = document.getElementById('call-controls');
+        const connectBtn = document.getElementById('connect-btn');
+        const videoToggleBtn = document.getElementById('video-toggle-btn');
+        const micToggleBtn = document.getElementById('mic-toggle-btn');
+        const inputContainer = document.getElementById('input-container');
+        const videoIcon = document.getElementById('video-icon');
+        const micIcon = document.getElementById('mic-icon');
 
-        // Initialize Audio Recording (Push-to-Talk with MediaRecorder)
-        let mediaRecorder = null;
-        let audioChunks = [];
-        let isRecording = false;
-        let audioStream = null;
-
-        // Use MediaRecorder for reliable audio capture
-        async function initMediaRecorder() {
+        async function connect() {
+            if (isConnected) return;
+            connectBtn.disabled = true;
+            connectBtn.textContent = 'Connecting...';
+            updateStatus('Connecting...');
             try {
-                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                console.log('Microphone access granted');
-                return true;
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                selfieVideo.srcObject = localStream;
+                selfiePlaceholder.style.display = 'none';
+                connectWs();
             } catch (err) {
-                console.error('Microphone access denied:', err);
-                alert('Microphone access is required. Please allow microphone access and reload.');
-                return false;
+                console.error("Error accessing media devices.", err);
+                alert("Could not access camera/microphone. Please check permissions.");
+                resetUI();
             }
         }
 
-        function connect() {
+        function disconnect() {
+            if (ws) ws.close();
+            if (localStream) localStream.getTracks().forEach(track => track.stop());
+            resetUI();
+        }
+
+        function resetUI() {
+            connectBtn.disabled = false;
+            connectBtn.textContent = 'Connect';
+            initialControls.style.display = 'flex';
+            callControls.style.display = 'none';
+            inputContainer.classList.add('hidden');
+            selfieVideo.srcObject = null;
+            selfiePlaceholder.style.display = 'flex';
+            avatarVideo.style.display = 'none';
+            avatarPlaceholder.style.display = 'flex';
+            isConnected = false;
+            isProcessing = false;
+            updateStatus('Ready to connect');
+        }
+        
+        function updateStatus(text) {
+            connectionStatus.textContent = text;
+        }
+
+        function toggleVideo() {
+            if (!localStream) return;
+            isVideoOn = !isVideoOn;
+            localStream.getVideoTracks()[0].enabled = isVideoOn;
+            // Update icon based on state
+            videoIcon.src = isVideoOn ? 'assets/video-on.png' : 'assets/video-off.png';
+        }
+
+        function connectWs() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
-            connectBtn.disabled = true;
-            connectBtn.textContent = 'Connecting...';
-            statusDiv.textContent = 'Connecting...';
-            statusDiv.className = 'call-status calling';
-
             ws.onopen = () => {
                 isConnected = true;
-                statusDiv.textContent = 'Connected';
-                statusDiv.className = 'call-status connected';
-
-                // Hide connect button, show controls and input
-                connectBtn.classList.add('hidden');
-                callControls.classList.add('active');
-                inputContainer.classList.add('active');
-                micHelp.classList.remove('hidden');
-
-                // Focus input
+                updateStatus('Connected');
+                initialControls.style.display = 'none';
+                callControls.style.display = 'flex';
+                inputContainer.classList.remove('hidden');
                 messageInput.focus();
+            };
+
+            ws.onclose = () => {
+                if(isConnected) disconnect();
+                updateStatus('Disconnected');
             };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-
                 if (data.type === 'response') {
-                    // Hide typing indicator
                     hideTypingIndicator();
-
-                    // Re-enable mic button
                     isProcessing = false;
-                    micBtn.disabled = false;
-
-                    if(data.transcribed_text)
-                    {
-                        addMessage(data.transcribed_text, 'user');
-                    }
-
-                    // Add message to chat
+                    micToggleBtn.disabled = false;
+                    if (data.transcribed_text) addMessage(data.transcribed_text, 'user');
                     addMessage(data.text, 'assistant');
-
-                    // Play voice response
-                    if (data.audio_url) {
-                        playVoice(data.audio_url);
-                    }
+                    if (data.audio_url) playVoice(data.audio_url);
                 }
             };
-
-            ws.onclose = () => {
-                isConnected = false;
-                isProcessing = false;
-                statusDiv.textContent = 'Disconnected';
-                statusDiv.className = 'call-status';
-
-                // Reset UI
-                connectBtn.classList.remove('hidden');
-                connectBtn.disabled = false;
-                connectBtn.textContent = 'Connect';
-                callControls.classList.remove('active');
-                inputContainer.classList.remove('active');
-                micHelp.classList.add('hidden');
-            };
-
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-            };
         }
 
-        function hangup() {
-            if (ws) {
-                ws.close();
-            }
-        }
-
-        // Push-to-Talk: Hold to record, release to send
         async function startRecording() {
             if (!isConnected || isRecording || isProcessing) return;
-
-            console.log('Starting recording...');
-
-            // Initialize microphone if not done
-            if (!audioStream) {
-                const granted = await initMediaRecorder();
-                if (!granted) return;
-            }
-
-            // Start recording
-            audioChunks = [];
-            mediaRecorder = new MediaRecorder(audioStream);
-
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunks.push(event.data);
-                }
-            };
-
-            mediaRecorder.onstop = async () => {
-                console.log('Recording stopped, uploading audio...');
-
-                // Show typing indicator and disable mic
-                showTypingIndicator();
-                isProcessing = true;
-                micBtn.disabled = true;
-
-                // Reset mic button
-                micBtn.textContent = '🎤';
-                micBtn.classList.remove('recording');
-                isRecording = false;
-
-                // Create blob from chunks
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-
-                // Send to server for transcription
-                const formData = new FormData();
-                formData.append('audio', audioBlob, 'recording.webm');
-
-                try {
-                    const response = await fetch('/api/voice-message', {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    const data = await response.json();
-
-                    // Hide typing indicator and re-enable mic
-                    hideTypingIndicator();
-                    isProcessing = false;
-                    micBtn.disabled = false;
-
-                    if (data.type === 'response') {
-                        // Show transcribed user message first (if available)
-                        if (data.transcribed_text) {
-                            addMessage(data.transcribed_text, 'user');
-                        }
-
-                        // Then add Vinay's response
-                        addMessage(data.text, 'assistant');
-
-                        // Play voice response
-                        if (data.audio_url) {
-                            playVoice(data.audio_url);
-                        }
-                    } else if (data.error) {
-                        console.error('Server error:', data.error);
-                        alert('Error: ' + data.error);
-                    }
-                } catch (err) {
-                    console.error('Upload error:', err);
-                    hideTypingIndicator();
-                    isProcessing = false;
-                    micBtn.disabled = false;
-                    alert('Failed to send audio. Please try again.');
-                }
-            };
-
-            // Start recording
-            mediaRecorder.start();
             isRecording = true;
-            micBtn.textContent = '🔴';
-            micBtn.classList.add('recording');
-            console.log('Recording started');
+            micToggleBtn.classList.add('recording');
+            micIcon.src = 'assets/mic-off.png'; // Using mic-off for "recording" state
+            audioChunks = [];
+            mediaRecorder = new MediaRecorder(localStream);
+            mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) audioChunks.push(event.data) };
+            mediaRecorder.onstop = uploadAudio;
+            mediaRecorder.start();
         }
+
+
 
         function stopRecording() {
-            if (!isConnected || !isRecording || !mediaRecorder) return;
-
-            console.log('Stopping recording...');
+            if (!isRecording || !mediaRecorder) return;
             mediaRecorder.stop();
+            isRecording = false;
+            micToggleBtn.classList.remove('recording');
+            micIcon.src = 'assets/mic-on.png';
         }
-
-        // Old toggle function (kept for compatibility)
-        function toggleMic() {
-            if (isRecording) {
-                stopRecording();
-            } else {
-                startRecording();
+        
+        async function uploadAudio() {
+            showTypingIndicator();
+            isProcessing = true;
+            micToggleBtn.disabled = true;
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.webm');
+            try {
+                const response = await fetch('/api/voice-message', { method: 'POST', body: formData });
+                const data = await response.json();
+                handleServerResponse(data);
+            } catch (err) {
+                console.error('Upload error:', err);
+                resetProcessingState();
+                alert('Failed to send audio.');
             }
         }
 
         function sendMessage() {
             const message = messageInput.value.trim();
             if (!message || !isConnected || isProcessing) return;
-
-            // Add user message to chat
             addMessage(message, 'user');
-
-            // Show typing indicator and disable mic
             showTypingIndicator();
             isProcessing = true;
-            micBtn.disabled = true;
-
-            // Send to server
-            ws.send(JSON.stringify({
-                type: 'text',
-                message: message
-            }));
-
-            // Clear input
+            micToggleBtn.disabled = true;
+            ws.send(JSON.stringify({ type: 'text', message: message }));
             messageInput.value = '';
+        }
+
+        function handleServerResponse(data) {
+            resetProcessingState();
+            if (data.type === 'response') {
+                if (data.transcribed_text) addMessage(data.transcribed_text, 'user');
+                addMessage(data.text, 'assistant');
+                if (data.audio_url) playVoice(data.audio_url);
+            } else if (data.error) {
+                alert('Error: ' + data.error);
+            }
+        }
+
+        function resetProcessingState() {
+            hideTypingIndicator();
+            isProcessing = false;
+            micToggleBtn.disabled = false;
         }
 
         function addMessage(text, sender) {
@@ -622,50 +410,30 @@
         }
 
         function showTypingIndicator() {
-            // Remove existing typing indicator if any
             hideTypingIndicator();
-
-            // Create typing indicator
             const typingDiv = document.createElement('div');
             typingDiv.className = 'typing-indicator';
             typingDiv.id = 'typing-indicator';
-
-            // Add 3 dots
             for (let i = 0; i < 3; i++) {
                 const dot = document.createElement('div');
                 dot.className = 'dot';
                 typingDiv.appendChild(dot);
             }
-
             messagesDiv.appendChild(typingDiv);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
 
         function hideTypingIndicator() {
-            const typingIndicator = document.getElementById('typing-indicator');
-            if (typingIndicator) {
-                typingIndicator.remove();
-            }
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
         }
 
         function playVoice(audioUrl) {
-            // Show waveform animation
-            waveform.classList.add('active');
-
-            // Play audio
             audioPlayer.src = audioUrl + '?t=' + Date.now();
             audioPlayer.play();
-
-            // Hide waveform when audio ends
-            audioPlayer.onended = () => {
-                waveform.classList.remove('active');
-            };
         }
 
-        // Enter key to send
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
+        messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
     </script>
 </body>
 </html>
