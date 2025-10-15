@@ -101,7 +101,7 @@ class VoiceChatServer:
 
         # Query API with chat ID
         api_response = await self.query_api(message, chat_id)
-        answer_text = api_response.get("answer", "I didn't understand that.")
+        answer_text = api_response.get("reply") or api_response.get("answer", "I didn't understand that.")
 
         print(f"🤖 Vinay: {answer_text}")
 
