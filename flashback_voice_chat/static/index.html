@@ -466,8 +466,11 @@
         function connect() {
             if (isConnected) return;
 
-            // Show name modal first
-            showNameModal();
+            connectBtn.disabled = true;
+            connectBtn.textContent = 'Connecting...';
+
+            // Connect WebSocket first, then show modal
+            setupUserMedia().then(() => connectWs());
         }
 
         function showNameModal() {
@@ -508,10 +511,10 @@
 
             const modalBtn = document.querySelector('.name-modal-connect');
             modalBtn.disabled = true;
-            modalBtn.textContent = 'Connecting...';
+            modalBtn.textContent = 'Starting...';
 
             try {
-                const response = await fetch('http://13.234.246.123:8188/chat/start', {
+                const response = await fetch('/chat/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: userName })
@@ -526,14 +529,27 @@
 
                 console.log('Chat session started:', chatId);
 
+                // Send initialization message to WebSocket with chatId
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'init',
+                        chatId: chatId,
+                        userName: userName
+                    }));
+                }
+
                 closeNameModal();
                 modalBtn.disabled = false;
                 modalBtn.textContent = 'Connect';
 
-                connectBtn.disabled = true;
-                connectBtn.textContent = 'Connecting...';
+                // Enable chat
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+                messageInput.placeholder = 'Type a message...';
+                messageInput.focus();
 
-                setupUserMedia().then(() => connectWs());
+                // Display initial welcome message
+                addMessage("Hi! I am Vinay's AI Twin", 'assistant');
 
             } catch (error) {
                 console.error('Error starting chat session:', error);
@@ -580,25 +596,12 @@
             ws.onopen = () => {
                 isConnected = true;
 
-                // Send initialization message with chatId
-                ws.send(JSON.stringify({
-                    type: 'init',
-                    chatId: chatId,
-                    userName: userName
-                }));
-
                 // Show in-call controls and hide connect button
                 initialControls.style.display = 'none';
                 inCallControls.style.display = 'flex';
 
-                // Enable chat
-                messageInput.disabled = false;
-                sendBtn.disabled = false;
-                messageInput.placeholder = 'Type a message...';
-                messageInput.focus();
-
-                // Display initial welcome message
-                addMessage("Hi! I am Vinay's AI Twin", 'assistant');
+                // Show name modal to get user's name
+                showNameModal();
             };
 
             ws.onclose = () => {

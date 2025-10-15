@@ -189,6 +189,38 @@ async def get_ui():
         return {"error": "UI (index.html) not found in the static directory."}
 
 
+@app.post("/chat/start")
+async def start_chat(data: dict):
+    """
+    Proxy endpoint for starting a chat session
+
+    POST body: {"name": "user name"}
+    Returns: {"chat_id": "...", "state": "...", ...}
+    """
+    name = data.get("name", "")
+
+    if not name:
+        return {"error": "No name provided"}
+
+    try:
+        # Call the external API
+        response = requests.post(
+            f"{voice_server.api_base_url}/chat/start",
+            headers={"content-type": "application/json"},
+            json={"name": name},
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {"error": f"API returned status {response.status_code}"}
+
+    except Exception as e:
+        print(f"❌ Error starting chat: {e}")
+        return {"error": str(e)}
+
+
 @app.post("/api/text-message")
 async def text_message(data: dict):
     """
