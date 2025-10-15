@@ -22,19 +22,19 @@ class VoiceChatServer:
 
     def __init__(
         self,
-        api_url: str = "http://13.234.246.123:8188/answer/generate",
+        api_base_url: str = "http://13.234.246.123:8188",
         reference_audio: str = None
     ):
         """
         Initialize voice chat server
 
         Args:
-            api_url: RAG API endpoint
+            api_base_url: Base URL for chat API
             reference_audio: Path to Vinay's voice sample for cloning
         """
         print("🚀 Initializing Flashback Voice Chat Server...")
 
-        self.api_url = api_url
+        self.api_base_url = api_base_url
 
         # Setup directories
         self.audio_dir = Path("static/audio")
@@ -46,20 +46,26 @@ class VoiceChatServer:
 
         print("✅ Voice Chat Server ready!")
 
-    async def query_api(self, question: str) -> dict:
+    async def query_api(self, question: str, chat_id: str) -> dict:
         """
-        Query the RAG API
+        Query the RAG API with chat ID
 
         Args:
             question: User's question
+            chat_id: Chat session ID
 
         Returns:
             API response dict
         """
         try:
+            # Use the chat/turn API endpoint with chat_id
             response = requests.post(
-                self.api_url,
-                json={"q": question},
+                f"{self.api_base_url}/chat/turn",
+                headers={"content-type": "application/json"},
+                json={
+                    "chat_id": chat_id,
+                    "text": question
+                },
                 timeout=30
             )
 
@@ -80,20 +86,21 @@ class VoiceChatServer:
                 "confidence": 0.0
             }
 
-    async def process_message(self, message: str) -> dict:
+    async def process_message(self, message: str, chat_id: str) -> dict:
         """
         Process user message and generate voice response
 
         Args:
             message: User's text message
+            chat_id: Chat session ID
 
         Returns:
             Response dict with text and audio
         """
         print(f"💬 User: {message}")
 
-        # Query API
-        api_response = await self.query_api(message)
+        # Query API with chat ID
+        api_response = await self.query_api(message, chat_id)
         answer_text = api_response.get("answer", "I didn't understand that.")
 
         print(f"🤖 Vinay: {answer_text}")
@@ -163,7 +170,7 @@ async def startup():
         raise FileNotFoundError(f"Reference audio required: {reference_audio}")
 
     voice_server = VoiceChatServer(
-        api_url="http://13.234.246.123:8188/answer/generate",
+        api_base_url="http://13.234.246.123:8188",
         reference_audio=reference_audio
     )
 
@@ -187,13 +194,17 @@ async def text_message(data: dict):
     """
     Handle text message from user (keyboard input)
 
-    POST body: {"message": "your text here"}
+    POST body: {"message": "your text here", "chatId": "chat_id"}
     """
     message = data.get("message", "")
+    chat_id = data.get("chatId", "")
+
     if not message:
         return {"error": "No message provided"}
+    if not chat_id:
+        return {"error": "No chatId provided"}
 
-    response = await voice_server.process_message(message)
+    response = await voice_server.process_message(message, chat_id)
     return response
 
 
@@ -241,8 +252,13 @@ async def voice_message(audio: UploadFile = File(...)):
 
         print(f"   Transcribed: {user_text}")
 
+        # Get chatId from request
+        # Note: For voice messages, chatId should be passed as form data or in URL
+        # For now, we'll handle it in the WebSocket connection
+        chat_id = "default"  # This should be passed properly in production
+
         # Process message
-        response = await voice_server.process_message(user_text)
+        response = await voice_server.process_message(user_text, chat_id)
 
         # Add transcribed text to response
         response["transcribed_text"] = user_text
@@ -278,6 +294,9 @@ async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time voice chat"""
     await websocket.accept()
 
+    chat_id = None
+    user_name = None
+
     try:
         print("🔌 Client connected")
 
@@ -294,13 +313,28 @@ async def websocket_endpoint(websocket: WebSocket):
             message_data = json.loads(data)
 
             message_type = message_data.get("type", "text")
+
+            # Handle initialization message with chatId
+            if message_type == "init":
+                chat_id = message_data.get("chatId")
+                user_name = message_data.get("userName")
+                print(f"✅ Chat session initialized: {chat_id} for {user_name}")
+                continue
+
             message_content = message_data.get("message", "")
 
             if not message_content:
                 continue
 
-            # Process message
-            response = await voice_server.process_message(message_content)
+            if not chat_id:
+                await websocket.send_json({
+                    "type": "error",
+                    "error": "Chat session not initialized"
+                })
+                continue
+
+            # Process message with chatId
+            response = await voice_server.process_message(message_content, chat_id)
 
             # Send response
             await websocket.send_json(response)
