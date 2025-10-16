@@ -26,7 +26,7 @@ VOICE_SETTINGS = {
 
     # Speed: Speech rate multiplier (0.5-2.0)
     # 1.0: Normal speed
-    "speed": 1.0,
+    "speed": 1.5,
 
     # Length Penalty: Controls output length
     # 1.0: Default
